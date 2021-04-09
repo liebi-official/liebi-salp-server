@@ -34,6 +34,14 @@ const Contributions = gql`
     inviterAddress: String
   }
 
+  input contributionRecord {
+    id: String!
+    amount: String!
+    invitee: String!
+    invitationCode: String! # 这个也不允许为空值。如果用户未填写，前端应传入一个默认邀请码
+    initTimestamp: Int!
+  }
+
   type Query {
     # 查询早鸟奖励相关数据
     earlyBirdData(account: String!): earlyBirdBonus
@@ -52,6 +60,8 @@ const Contributions = gql`
   type Mutation {
     # 生成邀请码
     generateInvitationCode(account: String!): invitationCodeData
+    # 写入前端传来的contribute信息，返回状态，状态可为以下内容中的一种, "ok", "fail"
+    writeContributionRecord(input: contributionRecord): String
   }
 `;
 
