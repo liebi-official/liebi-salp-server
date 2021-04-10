@@ -13,8 +13,6 @@ const server = new ApolloServer({
   context: { models },
 });
 
-console.log("kkkkkk: ", models);
-
 sequelize.sync().then(async () => {
   server.listen(4022).then(({ url }) => {
     console.log(`🚀 Server ready at ${url}`);

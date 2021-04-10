@@ -1,6 +1,6 @@
 import BigNumber from "bignumber.js";
 import dotenv from "dotenv";
-import { AddressBinder, CampaignInfo } from "../../server/models";
+import { getRandomCombination } from "../utils/Common";
 
 dotenv.config();
 const CAMPAIGN_NUM = parseInt(process.env.CAMPAIGN_NUM);
@@ -32,11 +32,21 @@ const Contributions = {
       };
     },
     getInvitationCode: async (parent, { account }, { models }) => {
-      // fake data
-      return {
-        invitationCode: "AA0000",
-        status: "existing",
-      };
+      let record = await models.InvitationCodes.findOne({
+        where: { invitor_address: account },
+      });
+
+      if (record) {
+        return {
+          invitationCode: record.invitor_code,
+          status: "existing",
+        };
+      } else {
+        return {
+          invitationCode: "",
+          status: "none",
+        };
+      }
     },
     getContributions: async (
       parent,
@@ -69,9 +79,42 @@ const Contributions = {
   // =============================================================================
   Mutation: {
     generateInvitationCode: async (parent, { account }, { models }) => {
-      // fake data
+      // 检查账户是否已有邀请码
+      let record = await models.InvitationCodes.findOne({
+        where: { invitor_address: account },
+      });
+
+      // status值为"new", "existing", "none"中的一种
+      if (record) {
+        return {
+          invitationCode: record.invitor_code,
+          status: "existing",
+        };
+      }
+
+      while (true) {
+        let newInvitationCode = getRandomCombination();
+
+        // 检查邀请码是否有重复
+        let rs = await models.InvitationCodes.findOne({
+          where: { invitor_code: newInvitationCode },
+        });
+
+        if (!rs) {
+          await models.InvitationCodes.create({
+            invitor_address: account,
+            invitor_code: newInvitationCode,
+          });
+          break;
+        }
+      }
+
+      let newRecord = await models.InvitationCodes.findOne({
+        where: { invitor_address: account },
+      });
+
       return {
-        invitationCode: "AA1111",
+        invitationCode: newRecord.invitor_code,
         status: "new",
       };
     },
