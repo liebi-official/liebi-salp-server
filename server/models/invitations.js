@@ -29,10 +29,7 @@ const invitations = (sequelize, DataTypes) => {
 
   // 表明在Invitation表里id字段与Transactions这个表的id字段相关联
   Invitations.associate = (models) => {
-    Invitations.belongsTo(models.Transactions, {
-      foreignKey: "id",
-      onDelete: "CASCADE",
-    });
+    Invitations.belongsTo(models.Transactions);
   };
 
   return Invitations;

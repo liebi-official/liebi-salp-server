@@ -1,6 +1,6 @@
-const { ApolloServer } = require("apollo-server");
-const { typeDefs, resolvers } = require("../graphql");
-const { models, sequelize } = require("./models");
+import { ApolloServer } from "apollo-server";
+import { typeDefs, resolvers } from "../graphql";
+import models, { sequelize } from "./models";
 
 require("dotenv").config();
 
@@ -10,8 +10,10 @@ const server = new ApolloServer({
   tracing: true,
   introspection: true,
   playground: true,
-  context: models,
+  context: { models },
 });
+
+console.log("kkkkkk: ", models);
 
 sequelize.sync().then(async () => {
   server.listen(4022).then(({ url }) => {

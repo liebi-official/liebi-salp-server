@@ -1,7 +1,7 @@
-const { mergeResolvers } = require("merge-graphql-schemas");
+import { mergeResolvers } from "merge-graphql-schemas";
 
-const Campaign = require("./Campaign");
-const Contributions = require("./Contributions");
+import Campaign from "./Campaign";
+import Contributions from "./Contributions";
 
 const resolvers = [Campaign, Contributions];
 

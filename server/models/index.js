@@ -19,7 +19,7 @@ const sequelize = new Sequelize(process.env.POSTGRESQL_URI, {
 const models = {
   Transactions: require("./transactions").default(sequelize, Sequelize),
   InvitationCodes: require("./invitationCodes").default(sequelize, Sequelize),
-  SalpOverview: require("./salpOverview").default(sequelize, Sequelize),
+  SalpOverviews: require("./salpOverviews").default(sequelize, Sequelize),
   Coefficients: require("./coefficients").default(sequelize, Sequelize),
   Invitations: require("./invitations").default(sequelize, Sequelize),
 };
@@ -30,4 +30,5 @@ Object.keys(models).forEach((key) => {
   }
 });
 
-export { models, sequelize };
+export { sequelize };
+export default models;

@@ -1,5 +1,5 @@
-const salpOverview = (sequelize, DataTypes) => {
-  const SalpOverview = sequelize.define("salpOverview", {
+const salpOverviews = (sequelize, DataTypes) => {
+  const SalpOverviews = sequelize.define("salpOverviews", {
     // 多签账户目标筹集额
     channel_target: {
       type: DataTypes.STRING,
@@ -19,7 +19,7 @@ const salpOverview = (sequelize, DataTypes) => {
     },
   });
 
-  return SalpOverview;
+  return SalpOverviews;
 };
 
-export default salpOverview;
+export default salpOverviews;

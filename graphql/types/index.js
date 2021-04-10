@@ -1,7 +1,7 @@
-const { mergeTypes } = require("merge-graphql-schemas");
+import { mergeTypes } from "merge-graphql-schemas";
 
-const Campaign = require("./Campaign");
-const Contributions = require("./Contributions");
+import Campaign from "./Campaign";
+import Contributions from "./Contributions";
 
 const typeDefs = [Campaign, Contributions];
 

@@ -12,7 +12,6 @@ const coefficients = (sequelize, DataTypes) => {
       allowNull: false,
       validate: {
         notEmpty: true,
-        isEmail: true,
       },
     },
     successful_auction_reward_coefficient: {
