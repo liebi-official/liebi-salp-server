@@ -118,6 +118,17 @@ const Contributions = {
         status: "new",
       };
     },
+
+    writeContributionRecord: async (parent, { input }, { models }) => {
+      const invitations = {
+        invitee: input.invitee,
+        invitationCode: input.invitationCode,
+        amount: input.amount
+      };
+
+      await models.Invitations.create(invitations);
+      return "ok";
+    },
   },
 };
 
