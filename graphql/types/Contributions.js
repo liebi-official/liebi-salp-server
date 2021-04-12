@@ -35,7 +35,7 @@ const Contributions = gql`
   }
 
   input contributionRecord {
-    id: String!
+    transactionsId: String!
     amount: String!
     invitee: String!
     invitationCode: String! # 这个也不允许为空值。如果用户未填写，前端应传入一个默认邀请码

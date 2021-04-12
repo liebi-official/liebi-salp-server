@@ -33,12 +33,12 @@ const Contributions = {
     },
     getInvitationCode: async (parent, { account }, { models }) => {
       let record = await models.InvitationCodes.findOne({
-        where: { invitor_address: account },
+        where: { inviter_address: account },
       });
 
       if (record) {
         return {
-          invitationCode: record.invitor_code,
+          invitationCode: record.inviter_code,
           status: "existing",
         };
       } else {
@@ -81,13 +81,13 @@ const Contributions = {
     generateInvitationCode: async (parent, { account }, { models }) => {
       // 检查账户是否已有邀请码
       let record = await models.InvitationCodes.findOne({
-        where: { invitor_address: account },
+        where: { inviter_address: account },
       });
 
       // status值为"new", "existing", "none"中的一种
       if (record) {
         return {
-          invitationCode: record.invitor_code,
+          invitationCode: record.inviter_code,
           status: "existing",
         };
       }
@@ -97,33 +97,35 @@ const Contributions = {
 
         // 检查邀请码是否有重复
         let rs = await models.InvitationCodes.findOne({
-          where: { invitor_code: newInvitationCode },
+          where: { inviter_code: newInvitationCode },
         });
 
         if (!rs) {
           await models.InvitationCodes.create({
-            invitor_address: account,
-            invitor_code: newInvitationCode,
+            inviter_address: account,
+            inviter_code: newInvitationCode,
           });
           break;
         }
       }
 
       let newRecord = await models.InvitationCodes.findOne({
-        where: { invitor_address: account },
+        where: { inviter_address: account },
       });
 
       return {
-        invitationCode: newRecord.invitor_code,
+        invitationCode: newRecord.inviter_code,
         status: "new",
       };
     },
 
     writeContributionRecord: async (parent, { input }, { models }) => {
       const invitations = {
+        transactions_id: input.transactionsId,
+        amount: input.amount,
         invitee: input.invitee,
-        invitationCode: input.invitationCode,
-        amount: input.amount
+        invitation_code: input.invitationCode,
+        init_timestamp: input.initTimestamp,
       };
 
       await models.Invitations.create(invitations);
