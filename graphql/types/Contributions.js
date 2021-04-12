@@ -4,9 +4,12 @@ const Contributions = gql`
   type earlyBirdBonus {
     personalContributions: String
     earlyBirdBonus: String
-    numberOfInvitation: Int
+    numberOfInvitees: Int
     invitationContributions: String
     earlyBirdInvitationBonus: String
+    vsTokenNumber: String
+    vsBondNumber: String
+    status: String # 值为 "ok"或"empty_account"
   }
 
   type successfulAuctionReward {
@@ -15,11 +18,12 @@ const Contributions = gql`
     numberOfInvitation: Int
     invitationContributions: String
     successfulAuctionRoyalty: String
+    status: String # 值为 "ok"或"empty_account"
   }
 
   type invitationCodeData {
     invitationCode: String
-    status: String # 值为"new", "existing", "none"
+    status: String # 值为"new", "existing", "none", "empty_account"
   }
 
   type contributionsData {
