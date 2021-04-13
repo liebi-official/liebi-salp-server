@@ -9,83 +9,35 @@ const transactions = (sequelize, DataTypes) => {
       },
       block_height: {
         type: DataTypes.INTEGER,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
       event_id: {
         type: DataTypes.INTEGER,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
       extrinsic_id: {
         type: DataTypes.INTEGER,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
       time: {
         type: DataTypes.DATE,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
       from: {
         type: DataTypes.STRING,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
+        allowNull: true,
       },
       to: {
         type: DataTypes.STRING,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
+        allowNull: true,
       },
       amount: {
         type: DataTypes.STRING,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
       type: {
         type: DataTypes.STRING,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
       created_at: {
         type: DataTypes.DATE,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
       updated_at: {
         type: DataTypes.DATE,
-        unique: true,
-        validate: {
-          len: [6, 6],
-          notEmpty: true,
-        },
       },
     },
     {

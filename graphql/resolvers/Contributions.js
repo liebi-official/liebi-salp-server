@@ -15,9 +15,15 @@ const getPersonalContributions = async (account, models) => {
 
   const condition = {
     where: { $and: [{ from: account }, { to: MULTISIG_ACCOUNT }] },
+    raw: true,
   };
 
   const personalContributionList = await models.Transactions.findAll(condition);
+
+  if (personalContributionList.length == 0) {
+    return new BigNumber(0);
+  }
+
   const personalContributions = getSumOfAFieldFromList(
     personalContributionList,
     "amount"
@@ -34,32 +40,60 @@ const getInvitationData = async (account, models) => {
     where: { inviter_address: account },
   };
 
-  let accountCode = (await models.InvitationCodes.findOne(condition))
-    .inviter_code;
+  let rs = await models.InvitationCodes.findOne(condition);
+
+  if (!rs) {
+    return {
+      numberOfInvitees: 0,
+      invitationContributions: new BigNumber(0),
+    };
+  }
+
+  let accountCode = rs.inviter_code;
 
   condition = {
     where: {
       invitation_code: accountCode,
     },
-    include: Transactions, // inner join,只有两个表都存在的id，才能出现在结果里
+    include: [
+      {
+        model: models.Transactions,
+        required: true, // required: true使查询变成inner join,只有两个表都存在的id，才能出现在结果里
+      },
+    ],
     raw: true, // 获取object array
   };
 
-  const accountInvitationList = await models.Invitations.findAll(condition).map(
-    el.get("amount")
-  );
+  const accountInvitationList = await models.Invitations.findAll(condition);
+
   const invitationContributions = getSumOfAFieldFromList(
     accountInvitationList,
     "amount"
   );
 
-  const accountInviteeList = await models.Invitations.findAll(condition).map(
-    el.get("from")
-  );
-  const uniqueInvitees = [...new Set(accountInviteeList)];
+  condition = {
+    where: {
+      invitation_code: accountCode,
+    },
+    attributes: ["invitee"],
+    include: [
+      {
+        model: models.Transactions,
+        attributes: [],
+        required: true, // required: true使查询变成inner join,只有两个表都存在的id，才能出现在结果里
+      },
+    ],
+    raw: true, // 获取object array
+  };
+  const accountInviteeList = await models.Invitations.findAll(condition);
+
+  let uniqueInvitees = new Set();
+  accountInviteeList.forEach((obj) => {
+    uniqueInvitees.add(obj.invitee);
+  });
 
   return {
-    numberOfInvitees: uniqueInvitees.length,
+    numberOfInvitees: uniqueInvitees.size,
     invitationContributions,
   };
 };
@@ -100,13 +134,14 @@ const Contributions = {
 
       // fake data
       return {
-        personalContributions: personalContributions.toFixed(),
-        earlyBirdBonus: earlyBirdBonus.toFixed(),
+        personalContributions: personalContributions.toFixed(0),
+        earlyBirdBonus: earlyBirdBonus.toFixed(0),
         numberOfInvitees: numberOfInvitees,
-        invitationContributions: invitationContributions.toFixed(),
-        earlyBirdInvitationBonus: earlyBirdInvitationBonus.toFixed(),
-        vsTokenNumber: personalContributions.toFixed(), // 与个人contributions金额数量一致
-        vsBondNumber: personalContributions.toFixed(), // 与个人contributions金额数量一致
+        invitationContributions: invitationContributions.toFixed(0),
+        earlyBirdInvitationBonus: earlyBirdInvitationBonus.toFixed(0),
+        vsTokenNumber: personalContributions.toFixed(0), // 与个人contributions金额数量一致
+        vsBondNumber: personalContributions.toFixed(0), // 与个人contributions金额数量一致
+        status: "ok",
       };
     },
     successfulAuctionRewardData: async (parent, { account }, { models }) => {
@@ -144,6 +179,7 @@ const Contributions = {
         numberOfInvitees: numberOfInvitees,
         invitationContributions: invitationContributions.toFixed(),
         successfulAuctionRoyalty: successfulAuctionRoyalty.toFixed(),
+        status: "ok",
       };
     },
     getInvitationCode: async (parent, { account }, { models }) => {

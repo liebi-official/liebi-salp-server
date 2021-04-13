@@ -15,7 +15,7 @@ const Contributions = gql`
   type successfulAuctionReward {
     personalContributions: String
     successfulAuctionReward: String
-    numberOfInvitation: Int
+    numberOfInvitees: Int
     invitationContributions: String
     successfulAuctionRoyalty: String
     status: String # 值为 "ok"或"empty_account"

@@ -27,10 +27,10 @@ const invitations = (sequelize, DataTypes) => {
           notEmpty: true,
         },
       },
-      // 邀请码，如果没有则默认为"AA0000",长度为6位
+      // 邀请码，如果没有则默认为"000000",长度为6位
       invitation_code: {
         type: DataTypes.STRING,
-        defaultValue: "AA0000",
+        defaultValue: "000000",
         allowNull: false,
         validate: {
           len: [6, 6],
