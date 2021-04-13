@@ -15,20 +15,16 @@
     "@babel/preset-env": "^7.1.0",
     "@polkadot/keyring": "^3.5.1",
     "@polkadot/util": "^3.5.1",
-    "@polkadot/util-crypto": "^3.5.1",
-    "cross-env": "^7.0.3"
+    "@polkadot/util-crypto": "^3.5.1"
   },
   "dependencies": {
     "apollo-server": "^2.4.8",
-    "axios": "^0.21.1",
     "bignumber.js": "^8.1.1",
     "dotenv": "^6.1.0",
     "graphql": "^14.2.1",
-    "luxon": "^1.13.1",
     "merge-graphql-schemas": "^1.5.7",
     "nodemon": "^1.18.10",
     "pg": "^8.5.1",
-    "sequelize": "^6.6.2",
-    "uuid": "^3.3.2"
+    "sequelize": "^6.6.2"
   }
 }

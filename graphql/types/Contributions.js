@@ -29,6 +29,7 @@ const Contributions = gql`
   type contributionsData {
     totalContributions: String
     contributions: [contribution]
+    status: String # 值为"ok"或"empty_account", "no_invitation_code"
   }
 
   type contribution {

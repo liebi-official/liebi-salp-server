@@ -16,6 +16,12 @@ const getPersonalContributions = async (account, models) => {
   const condition = {
     where: { $and: [{ from: account }, { to: MULTISIG_ACCOUNT }] },
     raw: true,
+    include: [
+      {
+        model: models.Invitations,
+        include: [{ model: models.InvitationCodes }],
+      },
+    ],
   };
 
   const personalContributionList = await models.Transactions.findAll(condition);
@@ -29,7 +35,7 @@ const getPersonalContributions = async (account, models) => {
     "amount"
   );
 
-  return personalContributions;
+  return { personalContributions, personalContributionList };
 };
 
 // 获取某账号下线的contributions的总额
@@ -68,7 +74,7 @@ const getInvitationData = async (account, models) => {
 
   const invitationContributions = getSumOfAFieldFromList(
     accountInvitationList,
-    "amount"
+    "transaction.amount"
   );
 
   condition = {
@@ -95,6 +101,7 @@ const getInvitationData = async (account, models) => {
   return {
     numberOfInvitees: uniqueInvitees.size,
     invitationContributions,
+    accountInvitationList,
   };
 };
 
@@ -114,7 +121,7 @@ const Contributions = {
       let record = await models.Coefficients.findOne();
 
       // 查询个人的contribution，并计算相应的早鸟奖励
-      const personalContributions = await getPersonalContributions(
+      const { personalContributions } = await getPersonalContributions(
         account,
         models
       );
@@ -154,7 +161,7 @@ const Contributions = {
       let record = await models.Coefficients.findOne();
 
       // 查询个人的contribution，并计算相应的竞拍成功奖励
-      const personalContributions = await getPersonalContributions(
+      const { personalContributions } = await getPersonalContributions(
         account,
         models
       );
@@ -204,51 +211,130 @@ const Contributions = {
       { contributorAccount, inviterAccount, recordNum },
       { models }
     ) => {
-      // let condition = {
-      //   where: { inviter_address: account },
-      // };
+      if (!contributorAccount & !inviterAccount) {
+        return {
+          status: "empty_account",
+        };
+      }
 
-      // let accountCode = (await models.InvitationCodes.findOne(condition))
-      //   .inviter_code;
+      if (!contributorAccount) {
+        // 查询下线的人头数及总contributions金额
+        const rs = await getInvitationData(inviterAccount, models);
 
-      // condition = {
-      //   where: {
-      //     invitation_code: accountCode,
-      //   },
-      //   include: Transactions, // inner join,只有两个表都存在的id，才能出现在结果里
-      //   raw: true, // 获取object array
-      // };
+        let invitationContributionList = rs.accountInvitationList.map(
+          (rawRs) => {
+            return {
+              contributorAddress: rawRs.invitee,
+              amount: rawRs["transaction.amount"],
+              timestamp: rawRs.init_timestamp,
+              inviterAddress: inviterAccount,
+            };
+          }
+        );
 
-      // const accountInvitationList = await models.Invitations.findAll(
-      //   condition
-      // ).map(el.get({ plain: true }));
+        if (invitationContributionList.length > recordNum) {
+          invitationContributionList = invitationContributionList.slice(
+            0,
+            recordNum
+          );
+        }
 
-      // const invitationContributions = getSumOfAFieldFromList(
-      //   accountInvitationList,
-      //   "amount"
-      // );
+        return {
+          totalContributions: rs.invitationContributions.toFixed(0),
+          contributions: invitationContributionList,
+          status: "ok",
+        };
+      }
 
-      // let inviteeList = await models.Invitations.findAll(condition).map(
-      //   el.get({ plain: true })
-      // );
+      if (!inviterAccount) {
+        const rs = await getPersonalContributions(contributorAccount, models);
+        let personalContributionList = rs.personalContributionList.map(
+          (rawRs) => {
+            return {
+              contributorAddress: contributorAccount,
+              amount: rawRs.amount,
+              timestamp: rawRs["invitation.init_timestamp"],
+              inviterAddress:
+                rawRs["invitation.invitationCode.inviter_address"],
+            };
+          }
+        );
+
+        if (personalContributionList.length > recordNum) {
+          personalContributionList = personalContributionList.slice(
+            0,
+            recordNum
+          );
+        }
+
+        return {
+          totalContributions: rs.personalContributions.toFixed(0),
+          contributions: personalContributionList,
+          status: "ok",
+        };
+      }
+
+      // 如果两个账户都存在，则查询出两人之间一共存在多少笔邀请交易
+      let condition = {
+        where: { inviter_address: inviterAccount },
+      };
+
+      let rs = await models.InvitationCodes.findOne(condition);
+
+      if (!rs) {
+        return {
+          totalContributions: "0",
+          contributions: [],
+          status: "no_invitation_code",
+        };
+      }
+
+      let accountCode = rs.inviter_code;
+
+      condition = {
+        where: {
+          invitation_code: accountCode,
+        },
+        include: [
+          {
+            model: models.Transactions,
+            where: { from: contributorAccount },
+            required: true, // required: true使查询变成inner join,只有两个表都存在的id，才能出现在结果里
+          },
+        ], // inner join,只有两个表都存在的id，才能出现在结果里
+        raw: true, // 获取object array
+      };
+
+      const rawInvitationList = await models.Invitations.findAll(condition);
+
+      let accountInvitationList = [];
+      let invitationContributions = new BigNumber(0);
+
+      if (rawInvitationList.length != 0) {
+        accountInvitationList = rawInvitationList.map((rawRs) => {
+          return {
+            contributorAddress: contributorAccount,
+            amount: rawRs["transaction.amount"],
+            timestamp: rawRs.init_timestamp,
+            inviterAddress: inviterAccount,
+          };
+        });
+
+        invitationContributions = getSumOfAFieldFromList(
+          accountInvitationList,
+          "amount"
+        );
+      }
+
+      if (accountInvitationList.length > recordNum) {
+        accountInvitationList = accountInvitationList.slice(0, recordNum);
+      }
 
       // fake data
       return {
-        totalContributions: "5555555",
-        contributions: [
-          {
-            contributorAddress: "aaaaaaaaa",
-            amount: "4444444",
-            timestamp: 1617793345,
-            inviterAddress: "bbbbbbbb",
-          },
-          {
-            contributorAddress: "bbbbbbbb",
-            amount: "1111111",
-            timestamp: 1617793388,
-            inviterAddress: "cccccccc",
-          },
-        ],
+        totalContributions: invitationContributions.toFixed(0),
+        contributions: accountInvitationList,
+        status: "ok",
       };
     },
   },
