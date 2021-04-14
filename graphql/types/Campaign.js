@@ -3,7 +3,7 @@ const { gql } = require("apollo-server");
 const Campaign = gql`
   type campaignInfo {
     targets: String
-    multisigAccountCurrentBalance: String
+    multisigAccountHistoricalBalance: String
     invitationStartTime: Int
     invitationEndTime: Int
     salpStartTime: Int
