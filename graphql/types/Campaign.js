@@ -1,7 +1,7 @@
 const { gql } = require("apollo-server");
 
 const Campaign = gql`
-  type campaignInfo {
+  type CampaignInfo {
     targets: String
     multisigAccountHistoricalBalance: String
     invitationStartTime: Int
@@ -12,7 +12,7 @@ const Campaign = gql`
   }
 
   type Query {
-    getCampaignInfo: campaignInfo
+    getCampaignInfo: CampaignInfo
   }
 `;
 

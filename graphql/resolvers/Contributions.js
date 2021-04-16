@@ -18,8 +18,7 @@ const getPersonalContributions = async (account, models) => {
     raw: true,
     include: [
       {
-        model: models.Invitations,
-        include: [{ model: models.InvitationCodes }],
+        model: models.InvitationCodes,
       },
     ],
   };
@@ -43,63 +42,35 @@ const getInvitationData = async (account, models) => {
   if (!account) return;
 
   let condition = {
-    where: { inviter_address: account },
+    where: { invited_by_address: account },
+    include: [
+      {
+        model: models.Transactions,
+        right: true, // will create a right join
+      },
+    ],
+    raw: true, // 获取object array
   };
 
-  let rs = await models.InvitationCodes.findOne(condition);
+  const accountInvitationList = await models.InvitationCodes.findAll(condition);
 
-  if (!rs) {
-    return {
-      numberOfInvitees: 0,
-      invitationContributions: new BigNumber(0),
-    };
+  let invitationContributions = new BigNumber(0);
+  if (accountInvitationList.length != 0) {
+    invitationContributions = getSumOfAFieldFromList(
+      accountInvitationList,
+      "transactions.amount"
+    );
   }
 
-  let accountCode = rs.inviter_code;
-
   condition = {
-    where: {
-      invitation_code: accountCode,
-    },
-    include: [
-      {
-        model: models.Transactions,
-        required: true, // required: true使查询变成inner join,只有两个表都存在的id，才能出现在结果里
-      },
-    ],
+    where: { invited_by_address: account },
     raw: true, // 获取object array
   };
-
-  const accountInvitationList = await models.Invitations.findAll(condition);
-
-  const invitationContributions = getSumOfAFieldFromList(
-    accountInvitationList,
-    "transaction.amount"
-  );
-
-  condition = {
-    where: {
-      invitation_code: accountCode,
-    },
-    attributes: ["invitee"],
-    include: [
-      {
-        model: models.Transactions,
-        attributes: [],
-        required: true, // required: true使查询变成inner join,只有两个表都存在的id，才能出现在结果里
-      },
-    ],
-    raw: true, // 获取object array
-  };
-  const accountInviteeList = await models.Invitations.findAll(condition);
-
-  let uniqueInvitees = new Set();
-  accountInviteeList.forEach((obj) => {
-    uniqueInvitees.add(obj.invitee);
-  });
+  const accountInviteeList = await models.InvitationCodes.findAll(condition);
+  let uniqueInvitees = accountInviteeList.length;
 
   return {
-    numberOfInvitees: uniqueInvitees.size,
+    numberOfInvitees: uniqueInvitees,
     invitationContributions,
     accountInvitationList,
   };
@@ -148,7 +119,6 @@ const Contributions = {
         earlyBirdInvitationBonus: earlyBirdInvitationBonus.toFixed(0),
         vsTokenNumber: personalContributions.toFixed(0), // 与个人contributions金额数量一致
         vsBondNumber: personalContributions.toFixed(0), // 与个人contributions金额数量一致
-        status: "ok",
       };
     },
     successfulAuctionRewardData: async (parent, { account }, { models }) => {
@@ -179,14 +149,12 @@ const Contributions = {
         record.successful_auction_royalty_coefficient
       ).multipliedBy(invitationContributions);
 
-      // fake data
       return {
         personalContributions: personalContributions.toFixed(),
         successfulAuctionReward: successfulAuctionReward.toFixed(),
         numberOfInvitees: numberOfInvitees,
         invitationContributions: invitationContributions.toFixed(),
         successfulAuctionRoyalty: successfulAuctionRoyalty.toFixed(),
-        status: "ok",
       };
     },
     getInvitationCode: async (parent, { account }, { models }) => {
@@ -206,135 +174,62 @@ const Contributions = {
         };
       }
     },
-    getContributions: async (
-      parent,
-      { contributorAccount, inviterAccount, recordNum },
-      { models }
-    ) => {
-      if (!contributorAccount & !inviterAccount) {
-        return {
-          status: "empty_account",
-        };
-      }
+    getContributions: async (parent, { account, recordNum }, { models }) => {
+      // 查询下线的人头数及总contributions金额
+      const invitationResult = await getInvitationData(account, models);
 
-      if (!contributorAccount) {
-        // 查询下线的人头数及总contributions金额
-        const rs = await getInvitationData(inviterAccount, models);
-
-        let invitationContributionList = rs.accountInvitationList.map(
+      let invitationContributionList = [];
+      if (invitationResult.accountInvitationList.length != 0) {
+        invitationContributionList = invitationResult.accountInvitationList.map(
           (rawRs) => {
             return {
-              contributorAddress: rawRs.invitee,
-              amount: rawRs["transaction.amount"],
-              timestamp: rawRs.init_timestamp,
-              inviterAddress: inviterAccount,
+              contributorAddress: rawRs["transactions.from"],
+              amount: rawRs["transactions.amount"],
+              timestamp: new Date(rawRs["transactions.time"])
+                .toISOString()
+                .slice(0, 19),
+              inviterAddress: account,
             };
           }
         );
-
-        if (invitationContributionList.length > recordNum) {
-          invitationContributionList = invitationContributionList.slice(
-            0,
-            recordNum
-          );
-        }
-
-        return {
-          totalContributions: rs.invitationContributions.toFixed(0),
-          contributions: invitationContributionList,
-          status: "ok",
-        };
       }
 
-      if (!inviterAccount) {
-        const rs = await getPersonalContributions(contributorAccount, models);
-        let personalContributionList = rs.personalContributionList.map(
+      if (invitationContributionList.length > recordNum) {
+        invitationContributionList = invitationContributionList.slice(
+          0,
+          recordNum
+        );
+      }
+
+      // 查询个人的贡献值
+      const personalResult = await getPersonalContributions(account, models);
+
+      let personalContributionList = [];
+      if (personalResult.personalContributionList.length != 0) {
+        personalContributionList = personalResult.personalContributionList.map(
           (rawRs) => {
             return {
-              contributorAddress: contributorAccount,
+              contributorAddress: account,
               amount: rawRs.amount,
-              timestamp: rawRs["invitation.init_timestamp"],
-              inviterAddress:
-                rawRs["invitation.invitationCode.inviter_address"],
+              timestamp: rawRs.time,
+              inviterAddress: rawRs["invitation_code.invited_by_address"],
             };
           }
         );
-
-        if (personalContributionList.length > recordNum) {
-          personalContributionList = personalContributionList.slice(
-            0,
-            recordNum
-          );
-        }
-
-        return {
-          totalContributions: rs.personalContributions.toFixed(0),
-          contributions: personalContributionList,
-          status: "ok",
-        };
       }
 
-      // 如果两个账户都存在，则查询出两人之间一共存在多少笔邀请交易
-      let condition = {
-        where: { inviter_address: inviterAccount },
-      };
-
-      let rs = await models.InvitationCodes.findOne(condition);
-
-      if (!rs) {
-        return {
-          totalContributions: "0",
-          contributions: [],
-          status: "no_invitation_code",
-        };
+      if (personalContributionList.length > recordNum) {
+        personalContributionList = personalContributionList.slice(0, recordNum);
       }
 
-      let accountCode = rs.inviter_code;
-
-      condition = {
-        where: {
-          invitation_code: accountCode,
-        },
-        include: [
-          {
-            model: models.Transactions,
-            where: { from: contributorAccount },
-            required: true, // required: true使查询变成inner join,只有两个表都存在的id，才能出现在结果里
-          },
-        ], // inner join,只有两个表都存在的id，才能出现在结果里
-        raw: true, // 获取object array
-      };
-
-      const rawInvitationList = await models.Invitations.findAll(condition);
-
-      let accountInvitationList = [];
-      let invitationContributions = new BigNumber(0);
-
-      if (rawInvitationList.length != 0) {
-        accountInvitationList = rawInvitationList.map((rawRs) => {
-          return {
-            contributorAddress: contributorAccount,
-            amount: rawRs["transaction.amount"],
-            timestamp: rawRs.init_timestamp,
-            inviterAddress: inviterAccount,
-          };
-        });
-
-        invitationContributions = getSumOfAFieldFromList(
-          accountInvitationList,
-          "amount"
-        );
-      }
-
-      if (accountInvitationList.length > recordNum) {
-        accountInvitationList = accountInvitationList.slice(0, recordNum);
-      }
-
-      // fake data
       return {
-        totalContributions: invitationContributions.toFixed(0),
-        contributions: accountInvitationList,
-        status: "ok",
+        totalContributions: personalResult.personalContributions.toFixed(0),
+        contributions: personalContributionList,
+        numberOfInvitees: invitationResult.numberOfInvitees,
+        totalInvitationContributions: invitationResult.invitationContributions.toFixed(
+          0
+        ),
+        invitationContributions: invitationContributionList,
       };
     },
   },
@@ -343,13 +238,21 @@ const Contributions = {
   //? MUTATIONS
   // =============================================================================
   Mutation: {
-    generateInvitationCode: async (parent, { account }, { models }) => {
-      // 检查账户是否已有邀请码
+    generateInvitationCode: async (parent, { input }, { models }) => {
+      let { account, invited_by_code } = input;
+
+      // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
+      const recordNum = await models.SalpOverviews.count();
+      if (recordNum == 0) {
+        await campaignInfoInitialization(models);
+      }
+
+      // 检查账户是否已经生成过邀请码
       let record = await models.InvitationCodes.findOne({
         where: { inviter_address: account },
       });
 
-      // status值为"new", "existing", "none"中的一种
+      // status值为"new", "existing", "none", "invalid_inviter_code", "invalid_code_generation_time", 中的一种
       if (record) {
         return {
           invitationCode: record.inviter_code,
@@ -357,6 +260,32 @@ const Contributions = {
         };
       }
 
+      // 再判断邀请人的邀请码是否有效。无效则返回邀请人无效
+      record = await models.InvitationCodes.findOne({
+        where: { inviter_code: invited_by_code },
+      });
+
+      if (!record) {
+        return {
+          status: "invalid_inviter_code",
+        };
+      }
+
+      // 最后判断是否处于邀请码生成的活动时间内，如果不是，则返回不在有效生成时间内
+      let currentTimestamp = Math.round(new Date().getTime() / 1000);
+
+      const campaignInfo = await models.SalpOverviews.findOne();
+
+      if (
+        currentTimestamp < campaignInfo.invitation_start_time ||
+        currentTimestamp > campaignInfo.invitation_end_time
+      ) {
+        return {
+          status: "invalid_code_generation_time",
+        };
+      }
+
+      // 生成邀请码
       while (true) {
         let newInvitationCode = getRandomCombination();
 
@@ -369,6 +298,7 @@ const Contributions = {
           await models.InvitationCodes.create({
             inviter_address: account,
             inviter_code: newInvitationCode,
+            invited_by_address: record.inviter_address,
           });
           break;
         }
@@ -382,19 +312,6 @@ const Contributions = {
         invitationCode: newRecord.inviter_code,
         status: "new",
       };
-    },
-
-    writeContributionRecord: async (parent, { input }, { models }) => {
-      const invitations = {
-        transactions_id: input.transactionsId,
-        amount: input.amount,
-        invitee: input.invitee,
-        invitation_code: input.invitationCode,
-        init_timestamp: input.initTimestamp,
-      };
-
-      await models.Invitations.create(invitations);
-      return "ok";
     },
   },
 };

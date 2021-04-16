@@ -24,23 +24,16 @@ const getRandomChars = (randomChars, length) => {
 
 // 默认配置的随机数长度分布
 const INIT_RANDOM_CONFIG = {
-  lowercase: 0,
   uppercase: 2,
   numeric: 4,
 };
 
 // 组合生成随机数
 export const getRandomCombination = (randomConfig = INIT_RANDOM_CONFIG) => {
-  const lowercaseChars = "abcdefghijklmnopqrstuvwxyz";
   const uppercaseChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const numericChars = "0123456789";
 
   let result = "";
-
-  if (randomConfig.lowercase != 0) {
-    result += getRandomChars(lowercaseChars, randomConfig.lowercase);
-  }
-
   if (randomConfig.uppercase != 0) {
     result += getRandomChars(uppercaseChars, randomConfig.uppercase);
   }
@@ -53,7 +46,6 @@ export const getRandomCombination = (randomConfig = INIT_RANDOM_CONFIG) => {
 };
 
 // campaign表初始化
-const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT;
 const INVITATION_START_TIME = parseInt(process.env.INVITATION_START_TIME);
 const INVITATION_END_TIME = parseInt(process.env.INVITATION_END_TIME);
 const SALP_START_TIME = parseInt(process.env.SALP_START_TIME);
@@ -70,35 +62,10 @@ const SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT = parseFloat(
   process.env.SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT
 );
 
-export const getMultisigAccountHistoricalBalance = async (models) => {
-  // 只要是转账到多签账户的交易都计算入内
-  const condition = {
-    where: { to: MULTISIG_ACCOUNT },
-    raw: true,
-  };
-
-  const historicalTransferList = await models.Transactions.findAll(condition);
-
-  const multisigAccountHistoricalBalance = getSumOfAFieldFromList(
-    historicalTransferList,
-    "amount"
-  );
-
-  return multisigAccountHistoricalBalance;
-};
-
 // 初始化salpOverview表和coefficients表
 export const campaignInfoInitialization = async (models) => {
-  // 获取已经产生的历史投票额
-  const multisigAccountHistoricalBalance = await getMultisigAccountHistoricalBalance(
-    models
-  );
-
   const initCampaignData = {
     channel_target: SALP_TARGET,
-    multisig_account_historical_balance: multisigAccountHistoricalBalance.toFixed(
-      0
-    ),
     invitation_start_time: INVITATION_START_TIME,
     invitation_end_time: INVITATION_END_TIME,
     salp_start_time: SALP_START_TIME,

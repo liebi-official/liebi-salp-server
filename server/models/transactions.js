@@ -78,10 +78,10 @@ const transactions = (sequelize, DataTypes) => {
   );
 
   Transactions.associate = (models) => {
-    Transactions.hasOne(models.Invitations, {
-      foreignKey: "transactions_id",
-      sourceKey: "id",
-      constraints: false, // 这个属性可以使invitations这个表的foreign key先于transactions表的id生成
+    Transactions.belongsTo(models.InvitationCodes, {
+      foreignKey: "from",
+      targetKey: "inviter_address",
+      constraints: false, // 这个属性可以使transactions这个表的foreign key先于invitation_codes表的inviter_address生成
     });
   };
 

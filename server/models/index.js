@@ -9,6 +9,7 @@ const sequelize = new Sequelize(process.env.POSTGRESQL_URI, {
     $and: Op.and,
     $or: Op.or,
     $eq: Op.eq,
+    $ne: Op.ne,
     $gt: Op.gt,
     $lt: Op.lt,
     $lte: Op.lte,
@@ -18,10 +19,9 @@ const sequelize = new Sequelize(process.env.POSTGRESQL_URI, {
 
 const models = {
   Transactions: require("./transactions").default(sequelize, Sequelize),
-  InvitationCodes: require("./invitationCodes").default(sequelize, Sequelize),
-  SalpOverviews: require("./salpOverviews").default(sequelize, Sequelize),
+  InvitationCodes: require("./invitation_codes").default(sequelize, Sequelize),
+  SalpOverviews: require("./salp_overviews").default(sequelize, Sequelize),
   Coefficients: require("./coefficients").default(sequelize, Sequelize),
-  Invitations: require("./invitations").default(sequelize, Sequelize),
 };
 
 Object.keys(models).forEach((key) => {
