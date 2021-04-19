@@ -85,3 +85,70 @@ export const campaignInfoInitialization = async (models) => {
 
   await models.Coefficients.create(initCoefficientData);
 };
+
+// 获取个人contributions的总额
+export const getPersonalContributions = async (account, models) => {
+  if (!account) return;
+
+  const condition = {
+    where: { $and: [{ from: account }, { to: MULTISIG_ACCOUNT }] },
+    raw: true,
+    include: [
+      {
+        model: models.InvitationCodes,
+      },
+    ],
+  };
+
+  const personalContributionList = await models.Transactions.findAll(condition);
+
+  if (personalContributionList.length == 0) {
+    return new BigNumber(0);
+  }
+
+  const personalContributions = getSumOfAFieldFromList(
+    personalContributionList,
+    "amount"
+  );
+
+  return { personalContributions, personalContributionList };
+};
+
+// 获取某账号下线的contributions的总额
+export const getInvitationData = async (account, models) => {
+  if (!account) return;
+
+  let condition = {
+    where: { invited_by_address: account },
+    include: [
+      {
+        model: models.Transactions,
+        right: true, // will create a right join
+      },
+    ],
+    raw: true, // 获取object array
+  };
+
+  const accountInvitationList = await models.InvitationCodes.findAll(condition);
+
+  let invitationContributions = new BigNumber(0);
+  if (accountInvitationList.length != 0) {
+    invitationContributions = getSumOfAFieldFromList(
+      accountInvitationList,
+      "transactions.amount"
+    );
+  }
+
+  condition = {
+    where: { invited_by_address: account },
+    raw: true, // 获取object array
+  };
+  const accountInviteeList = await models.InvitationCodes.findAll(condition);
+  let uniqueInvitees = accountInviteeList.length;
+
+  return {
+    numberOfInvitees: uniqueInvitees,
+    invitationContributions,
+    accountInvitationList,
+  };
+};

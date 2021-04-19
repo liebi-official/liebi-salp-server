@@ -2,79 +2,13 @@ import BigNumber from "bignumber.js";
 import {
   getRandomCombination,
   campaignInfoInitialization,
-  getSumOfAFieldFromList,
+  getPersonalContributions,
+  getInvitationData,
 } from "../utils/Common";
 import dotenv from "dotenv";
 dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
-
-// 获取个人contributions的总额
-const getPersonalContributions = async (account, models) => {
-  if (!account) return;
-
-  const condition = {
-    where: { $and: [{ from: account }, { to: MULTISIG_ACCOUNT }] },
-    raw: true,
-    include: [
-      {
-        model: models.InvitationCodes,
-      },
-    ],
-  };
-
-  const personalContributionList = await models.Transactions.findAll(condition);
-
-  if (personalContributionList.length == 0) {
-    return new BigNumber(0);
-  }
-
-  const personalContributions = getSumOfAFieldFromList(
-    personalContributionList,
-    "amount"
-  );
-
-  return { personalContributions, personalContributionList };
-};
-
-// 获取某账号下线的contributions的总额
-const getInvitationData = async (account, models) => {
-  if (!account) return;
-
-  let condition = {
-    where: { invited_by_address: account },
-    include: [
-      {
-        model: models.Transactions,
-        right: true, // will create a right join
-      },
-    ],
-    raw: true, // 获取object array
-  };
-
-  const accountInvitationList = await models.InvitationCodes.findAll(condition);
-
-  let invitationContributions = new BigNumber(0);
-  if (accountInvitationList.length != 0) {
-    invitationContributions = getSumOfAFieldFromList(
-      accountInvitationList,
-      "transactions.amount"
-    );
-  }
-
-  condition = {
-    where: { invited_by_address: account },
-    raw: true, // 获取object array
-  };
-  const accountInviteeList = await models.InvitationCodes.findAll(condition);
-  let uniqueInvitees = accountInviteeList.length;
-
-  return {
-    numberOfInvitees: uniqueInvitees,
-    invitationContributions,
-    accountInvitationList,
-  };
-};
 
 // GraphQL查询的resolver
 const Contributions = {
