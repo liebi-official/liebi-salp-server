@@ -29,6 +29,25 @@ const Report = {
         }
       }
 
+      // 准备一个表，关于每个的是哪个邀请码邀请进来的
+      let byCodeData = await models.InvitationCodes.findAll({
+        include: [
+          {
+            model: models.InvitationCodes,
+            as: "InvitedByCode",
+          },
+        ],
+        raw: true,
+      });
+
+      let byCodeObj = {};
+      for (const byCodeItem of byCodeData) {
+        if (byCodeItem.invited_by_address) {
+          byCodeObj[byCodeItem.inviter_address] =
+            byCodeItem["InvitedByCode.inviter_code"];
+        }
+      }
+
       // 再查出个人的第一笔vote时间
       let condition = {
         raw: true,
@@ -81,6 +100,7 @@ const Report = {
             address: record.from,
             invitedBy: record["invitation_code.invited_by_address"],
             invitationCode: record["invitation_code.inviter_code"],
+            invitedByCode: byCodeObj[record.from],
             firstVotingTime: new Date(record.time).toISOString().slice(0, 19),
             numberOfInvitees: inviteeNumObj[record.from] || 0,
           };

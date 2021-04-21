@@ -5,6 +5,7 @@ const Report = gql`
     address: String
     invitedBy: String
     invitationCode: String
+    invitedByCode: String
     firstVotingTime: String
     numberOfInvitees: Int
   }

@@ -25,6 +25,10 @@ const Contributions = gql`
     status: String
   }
 
+  type AccountByInvitation {
+    account: String
+  }
+
   type ContributionsData {
     totalContributions: String
     contributions: [Contribution]
@@ -51,9 +55,17 @@ const Contributions = gql`
     # 查询成功竞拍后获得的奖励
     successfulAuctionRewardData(account: String!): SuccessfulAuctionReward
     # 查询邀请码
-    getInvitationCode(account: String!): InvitationCodeData
+    getInvitationCodeByAccount(account: String!): InvitationCodeData
+    # 通过邀请码查询用户账号
+    getAccountByInvitationCode(code: String!): AccountByInvitation
     # 查询contribution明细
     getContributions(account: String!, recordNum: Int = 50): ContributionsData
+    # 查询用户的自己的contribution是否超过了某个金额，如果是的话，返回true，不是的话，返回false
+    # 默认值为 "10000000000"，相当于0.1个ksm
+    ifContributeEnough(
+      account: String!
+      threshold: String = "10000000000"
+    ): Boolean
   }
 
   type Mutation {

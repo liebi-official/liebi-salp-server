@@ -2,6 +2,8 @@ import BigNumber from "bignumber.js";
 import dotenv from "dotenv";
 dotenv.config();
 
+const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
+
 // return bignumber format. Only valid for single layer filed.
 export const getSumOfAFieldFromList = (list, field) => {
   return list
@@ -103,7 +105,10 @@ export const getPersonalContributions = async (account, models) => {
   const personalContributionList = await models.Transactions.findAll(condition);
 
   if (personalContributionList.length == 0) {
-    return new BigNumber(0);
+    return {
+      personalContributions: new BigNumber(0),
+      personalContributionList: [],
+    };
   }
 
   const personalContributions = getSumOfAFieldFromList(

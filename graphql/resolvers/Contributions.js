@@ -5,10 +5,6 @@ import {
   getPersonalContributions,
   getInvitationData,
 } from "../utils/Common";
-import dotenv from "dotenv";
-dotenv.config();
-
-const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
 
 // GraphQL查询的resolver
 const Contributions = {
@@ -91,7 +87,7 @@ const Contributions = {
         successfulAuctionRoyalty: successfulAuctionRoyalty.toFixed(),
       };
     },
-    getInvitationCode: async (parent, { account }, { models }) => {
+    getInvitationCodeByAccount: async (parent, { account }, { models }) => {
       let record = await models.InvitationCodes.findOne({
         where: { inviter_address: account },
       });
@@ -105,6 +101,21 @@ const Contributions = {
         return {
           invitationCode: "",
           status: "none",
+        };
+      }
+    },
+    getAccountByInvitationCode: async (parent, { code }, { models }) => {
+      let record = await models.InvitationCodes.findOne({
+        where: { inviter_code: code },
+      });
+
+      if (record) {
+        return {
+          account: record.inviter_address,
+        };
+      } else {
+        return {
+          account: "",
         };
       }
     },
@@ -165,6 +176,18 @@ const Contributions = {
         ),
         invitationContributions: invitationContributionList,
       };
+    },
+    ifContributeEnough: async (parent, { account, threshold }, { models }) => {
+      // 查询个人的贡献值
+      const personalResult = await getPersonalContributions(account, models);
+
+      if (
+        personalResult.personalContributions.isGreaterThanOrEqualTo(threshold)
+      ) {
+        return true;
+      } else {
+        return false;
+      }
     },
   },
 

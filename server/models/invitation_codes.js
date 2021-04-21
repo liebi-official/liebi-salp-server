@@ -29,7 +29,8 @@ const invitation_codes = (sequelize, DataTypes) => {
 
     InvitationCodes.belongsTo(models.InvitationCodes, {
       foreignKey: "invited_by_address",
-      targetKey: "inviter_code",
+      targetKey: "inviter_address",
+      as: "InvitedByCode",
     });
 
     InvitationCodes.hasMany(models.Transactions, {
