@@ -1,18 +1,23 @@
 const { gql } = require("apollo-server");
 
 const Campaign = gql`
-  type CampaignInfo {
+  type Progress {
     targets: String
     multisigAccountHistoricalBalance: String
+  }
+
+  type Timetable {
     invitationStartTime: Int
     invitationEndTime: Int
+    salpWhitelistStartTime: Int
     salpStartTime: Int
     salpEndTime: Int
-    campaignStatus: String # 值可能为以下几种中的一种："bidding","successful","failed"
+    serverTime: Int
   }
 
   type Query {
-    getCampaignInfo: CampaignInfo
+    getCampaignProgress: Progress
+    getTimetable: Timetable
   }
 `;
 

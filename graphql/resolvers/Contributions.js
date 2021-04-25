@@ -4,6 +4,9 @@ import {
   campaignInfoInitialization,
   getPersonalContributions,
   getInvitationData,
+  queryIfReserved,
+  KSM_RESERVATION_AMOUNT,
+  getRewardedPersonalContributions,
 } from "../utils/Common";
 
 // GraphQL查询的resolver
@@ -12,43 +15,23 @@ const Contributions = {
   // ? QUERIES
   // ===========================================================================
   Query: {
-    earlyBirdData: async (parent, { account }, { models }) => {
-      // 确保Coefficients表有值
-      let recordNum = await models.Coefficients.count();
-      if (recordNum == 0) {
-        await campaignInfoInitialization(models);
-      }
+    getEarlyBirdData: async (parent, { account }, { models }) => {
+      // 判断该账户是否已预约
+      const ifReserved = await queryIfReserved(account, models);
 
-      let record = await models.Coefficients.findOne();
-
-      // 查询个人的contribution，并计算相应的早鸟奖励
+      // 查询个人的contribution，可用于展示vsKSM有多少
       const { personalContributions } = await getPersonalContributions(
         account,
         models
       );
-      const earlyBirdBonus = new BigNumber(
-        record.early_bird_coefficient
-      ).multipliedBy(personalContributions);
 
-      // 查询下线的人头数及总contributions金额
-      const {
-        numberOfInvitees,
-        invitationContributions,
-      } = await getInvitationData(account, models);
+      // 查询下线的人头数
+      const { numberOfInvitees } = await getInvitationData(account, models);
 
-      const earlyBirdInvitationBonus = new BigNumber(
-        record.early_bird_invitation_coefficient
-      ).multipliedBy(invitationContributions);
-
-      // fake data
       return {
+        ifReserved: ifReserved,
         personalContributions: personalContributions.toFixed(0),
-        earlyBirdBonus: earlyBirdBonus.toFixed(0),
         numberOfInvitees: numberOfInvitees,
-        invitationContributions: invitationContributions.toFixed(0),
-        earlyBirdInvitationBonus: earlyBirdInvitationBonus.toFixed(0),
-        vsTokenNumber: personalContributions.toFixed(0), // 与个人contributions金额数量一致
-        vsBondNumber: personalContributions.toFixed(0), // 与个人contributions金额数量一致
       };
     },
     successfulAuctionRewardData: async (parent, { account }, { models }) => {
@@ -60,14 +43,28 @@ const Contributions = {
 
       let record = await models.Coefficients.findOne();
 
-      // 查询个人的contribution，并计算相应的竞拍成功奖励
+      // 判断该账户是否已预约
+      const ifReserved = await queryIfReserved(account, models);
+      let reservationReward = new BigNumber(0);
+      if (ifReserved) {
+        reservationReward = new BigNumber(
+          record.successful_auction_reward_coefficient
+        ).multipliedBy(KSM_RESERVATION_AMOUNT);
+      }
+      // 查询个人的所有contribution
       const { personalContributions } = await getPersonalContributions(
         account,
         models
       );
+
+      // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
+      const {
+        rewardedPersonalContributions,
+      } = await getRewardedPersonalContributions(account, models);
+
       const successfulAuctionReward = new BigNumber(
         record.successful_auction_reward_coefficient
-      ).multipliedBy(personalContributions);
+      ).multipliedBy(rewardedPersonalContributions);
 
       // 查询下线的人头数及总contributions金额
       const {
@@ -80,11 +77,14 @@ const Contributions = {
       ).multipliedBy(invitationContributions);
 
       return {
+        ifReserved: ifReserved,
         personalContributions: personalContributions.toFixed(),
+        rewardedPersonalContributions: rewardedPersonalContributions.toFixed(),
         successfulAuctionReward: successfulAuctionReward.toFixed(),
         numberOfInvitees: numberOfInvitees,
         invitationContributions: invitationContributions.toFixed(),
         successfulAuctionRoyalty: successfulAuctionRoyalty.toFixed(),
+        reservationReward: reservationReward.toFixed(),
       };
     },
     getInvitationCodeByAccount: async (parent, { account }, { models }) => {
@@ -177,17 +177,9 @@ const Contributions = {
         invitationContributions: invitationContributionList,
       };
     },
-    ifContributeEnough: async (parent, { account, threshold }, { models }) => {
+    ifReserved: async (parent, { account }, { models }) => {
       // 查询个人的贡献值
-      const personalResult = await getPersonalContributions(account, models);
-
-      if (
-        personalResult.personalContributions.isGreaterThanOrEqualTo(threshold)
-      ) {
-        return true;
-      } else {
-        return false;
-      }
+      return await queryIfReserved(account, models);
     },
   },
 

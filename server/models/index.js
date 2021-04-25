@@ -11,6 +11,7 @@ const sequelize = new Sequelize(process.env.POSTGRESQL_URI, {
     $eq: Op.eq,
     $ne: Op.ne,
     $gt: Op.gt,
+    $gte: Op.gte,
     $lt: Op.lt,
     $lte: Op.lte,
     $like: Op.like,

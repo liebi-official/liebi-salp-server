@@ -1,8 +1,10 @@
 import BigNumber from "bignumber.js";
 import dotenv from "dotenv";
+import { sequelize } from "../../server/models";
 dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
+export const KSM_RESERVATION_AMOUNT = 1000000000; // 1^10 = 0.01 KSM
 
 // return bignumber format. Only valid for single layer filed.
 export const getSumOfAFieldFromList = (list, field) => {
@@ -50,13 +52,12 @@ export const getRandomCombination = (randomConfig = INIT_RANDOM_CONFIG) => {
 // campaign表初始化
 const INVITATION_START_TIME = parseInt(process.env.INVITATION_START_TIME);
 const INVITATION_END_TIME = parseInt(process.env.INVITATION_END_TIME);
+const SALP_WHITELIST_AHEAD_HOURS = parseInt(
+  process.env.SALP_WHITELIST_AHEAD_HOURS
+);
 const SALP_START_TIME = parseInt(process.env.SALP_START_TIME);
 const SALP_END_TIME = parseInt(process.env.SALP_END_TIME);
 const SALP_TARGET = process.env.SALP_TARGET;
-const EARLY_BIRD_COEFFICIENT = parseFloat(process.env.EARLY_BIRD_COEFFICIENT);
-const EARLY_BIRD_INVITATION_COEFFICIENT = parseFloat(
-  process.env.EARLY_BIRD_INVITATION_COEFFICIENT
-);
 const SUCCESSFUL_AUCTION_REWARD_COEFFICIENT = parseFloat(
   process.env.SUCCESSFUL_AUCTION_REWARD_COEFFICIENT
 );
@@ -64,12 +65,16 @@ const SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT = parseFloat(
   process.env.SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT
 );
 
+const SECONDS_PER_HOUR = 60 * 60;
+
 // 初始化salpOverview表和coefficients表
 export const campaignInfoInitialization = async (models) => {
   const initCampaignData = {
     channel_target: SALP_TARGET,
     invitation_start_time: INVITATION_START_TIME,
     invitation_end_time: INVITATION_END_TIME,
+    salp_whitelist_start_time:
+      SALP_START_TIME - SECONDS_PER_HOUR * SALP_WHITELIST_AHEAD_HOURS,
     salp_start_time: SALP_START_TIME,
     salp_end_time: SALP_END_TIME,
     campaign_status: "bidding",
@@ -79,8 +84,6 @@ export const campaignInfoInitialization = async (models) => {
 
   // 默认初始值
   const initCoefficientData = {
-    early_bird_coefficient: EARLY_BIRD_COEFFICIENT,
-    early_bird_invitation_coefficient: EARLY_BIRD_INVITATION_COEFFICIENT,
     successful_auction_reward_coefficient: SUCCESSFUL_AUCTION_REWARD_COEFFICIENT,
     successful_auction_royalty_coefficient: SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT,
   };
@@ -156,4 +159,97 @@ export const getInvitationData = async (account, models) => {
     invitationContributions,
     accountInvitationList,
   };
+};
+
+// 查询用户是否是在白名单内
+export const queryIfReserved = async (account, models) => {
+  const rs = await models.InvitationCodes.findOne({
+    inviter_address: account,
+  });
+  if (rs) {
+    return true;
+  } else {
+    return false;
+  }
+};
+
+// 获取个人符合条件，用于计算奖励的contributions。条件有如下几条：
+// 1. 如果用户不在白名单内，正式开投时间 - 结束时间的 个人所有contributions都算进去
+// 2. 如果用户在白名单内，提前开始时间 - 结束时间的 个人所有contributions都算进去
+
+export const getRewardedPersonalContributions = async (account, models) => {
+  if (!account) return;
+
+  // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
+  const recordNum = await models.SalpOverviews.count();
+  if (recordNum == 0) {
+    await campaignInfoInitialization(models);
+  }
+
+  const timeRecord = await models.SalpOverviews.findOne({});
+
+  // 获取各种时间
+  const whitelist_start_time_formatted = await sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_whitelist_start_time
+  );
+
+  const start_time_formatted = sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_start_time
+  );
+  const end_time_formatted = sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_end_time
+  );
+
+  let condition = {
+    where: {
+      $and: [
+        { from: account },
+        { to: MULTISIG_ACCOUNT },
+        {
+          time: {
+            $lte: end_time_formatted,
+          },
+        },
+      ],
+    },
+    raw: true,
+    include: [
+      {
+        model: models.InvitationCodes,
+      },
+    ],
+  };
+
+  // 判断该账户是否已预约，根据预约的情况，从不同的时间开始计算参与奖励的contributions
+  const ifReserved = await queryIfReserved(account, models);
+  if (ifReserved) {
+    condition.where["$and"].push({
+      time: { $gte: whitelist_start_time_formatted },
+    });
+  } else {
+    condition.where["$and"].push({
+      time: { $gte: start_time_formatted },
+    });
+  }
+
+  const rewardedPersonalContributionList = await models.Transactions.findAll(
+    condition
+  );
+
+  if (rewardedPersonalContributionList.length == 0) {
+    return {
+      rewardedPersonalContributions: new BigNumber(0),
+      rewardedPersonalContributionList: [],
+    };
+  }
+
+  const rewardedPersonalContributions = getSumOfAFieldFromList(
+    rewardedPersonalContributionList,
+    "amount"
+  );
+
+  return { rewardedPersonalContributions, rewardedPersonalContributionList };
 };

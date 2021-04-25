@@ -1,22 +1,21 @@
 const { gql } = require("apollo-server");
 
 const Contributions = gql`
-  type EarlyBirdBonus {
-    personalContributions: String
-    earlyBirdBonus: String
+  type EarlyBirdData {
+    ifReserved: Boolean # 该账户是否已预约
+    personalContributions: String # 用于展示vsKSM有多少
     numberOfInvitees: Int
-    invitationContributions: String
-    earlyBirdInvitationBonus: String
-    vsTokenNumber: String
-    vsBondNumber: String
   }
 
   type SuccessfulAuctionReward {
-    personalContributions: String
-    successfulAuctionReward: String
+    ifReserved: Boolean # 该账户是否已预约
+    personalContributions: String # 用于展示vsKSM有多少
+    rewardedPersonalContributions: String # 用于计算符合条件的奖励有多少
+    successfulAuctionReward: String # 符合条件的奖励
     numberOfInvitees: Int
     invitationContributions: String
     successfulAuctionRoyalty: String
+    reservationReward: String
   }
 
   type InvitationCodeData {
@@ -51,25 +50,21 @@ const Contributions = gql`
 
   type Query {
     # 查询早鸟奖励相关数据
-    earlyBirdData(account: String!): EarlyBirdBonus
+    getEarlyBirdData(account: String!): EarlyBirdData
     # 查询成功竞拍后获得的奖励
     successfulAuctionRewardData(account: String!): SuccessfulAuctionReward
-    # 查询邀请码
+    # 通过账号查询用户自己的邀请码
     getInvitationCodeByAccount(account: String!): InvitationCodeData
     # 通过邀请码查询用户账号
     getAccountByInvitationCode(code: String!): AccountByInvitation
     # 查询contribution明细
     getContributions(account: String!, recordNum: Int = 50): ContributionsData
-    # 查询用户的自己的contribution是否超过了某个金额，如果是的话，返回true，不是的话，返回false
-    # 默认值为 "10000000000"，相当于0.1个ksm
-    ifContributeEnough(
-      account: String!
-      threshold: String = "10000000000"
-    ): Boolean
+    # 查询用户是否已预约，即是否在白名单内
+    ifReserved(account: String!): Boolean
   }
 
   type Mutation {
-    # 生成邀请码
+    # 预约：进入白名单+生成邀请码
     generateInvitationCode(input: CodeGenerationInput): InvitationCodeData
   }
 `;

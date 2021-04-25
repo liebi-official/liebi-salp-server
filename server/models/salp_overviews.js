@@ -10,15 +10,6 @@ const salp_overviews = (sequelize, DataTypes) => {
           notEmpty: true,
         },
       },
-      // 多签账户历史总额
-      multisig_account_historical_balance: {
-        type: DataTypes.STRING,
-        defaultValue: "0",
-        allowNull: false,
-        validate: {
-          notEmpty: true,
-        },
-      },
       // 邀请码生成开始时间
       invitation_start_time: {
         type: DataTypes.INTEGER,
@@ -29,6 +20,14 @@ const salp_overviews = (sequelize, DataTypes) => {
       },
       // 邀请码生成结束时间
       invitation_end_time: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        validate: {
+          len: [10, 10],
+        },
+      },
+      // 预约的白名单用户投票开始时间
+      salp_whitelist_start_time: {
         type: DataTypes.INTEGER,
         allowNull: false,
         validate: {

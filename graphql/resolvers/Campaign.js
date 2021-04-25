@@ -35,7 +35,7 @@ const Campaign = {
   // ? QUERIES
   // ===========================================================================
   Query: {
-    getCampaignInfo: async (parent, {}, { models }) => {
+    getCampaignProgress: async (parent, {}, { models }) => {
       // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
       const recordNum = await models.SalpOverviews.count();
       if (recordNum == 0) {
@@ -54,11 +54,30 @@ const Campaign = {
         multisigAccountHistoricalBalance: multisig_account_historical_balance.toFixed(
           0
         ),
+      };
+    },
+    getTimetable: async (parent, {}, { models }) => {
+      // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
+      const recordNum = await models.SalpOverviews.count();
+      if (recordNum == 0) {
+        await campaignInfoInitialization(models);
+      }
+
+      // 获取多签账户历史记录余额
+      const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
+        models
+      );
+
+      const record = await models.SalpOverviews.findOne();
+
+      return {
         invitationStartTime: record.invitation_start_time,
         invitationEndTime: record.invitation_end_time,
+        salpWhitelistStartTime: record.salp_whitelist_start_time,
         salpStartTime: record.salp_start_time,
         salpEndTime: record.salp_end_time,
         campaignStatus: record.campaign_status,
+        serverTime: Math.round(new Date().getTime() / 1000),
       };
     },
   },
