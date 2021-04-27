@@ -7,6 +7,7 @@ import {
   queryIfReserved,
   KSM_RESERVATION_AMOUNT,
   getRewardedPersonalContributions,
+  authenticateReserveTransaction,
 } from "../utils/Common";
 
 // GraphQL查询的resolver
@@ -43,10 +44,11 @@ const Contributions = {
 
       let record = await models.Coefficients.findOne();
 
-      // 判断该账户是否已预约
-      const ifReserved = await queryIfReserved(account, models);
+      // 判断该账户是否已锁定过预约的钱
+      const ifAuth = await authenticateReserveTransaction(account, models);
+
       let reservationReward = new BigNumber(0);
-      if (ifReserved) {
+      if (ifAuth) {
         reservationReward = new BigNumber(
           record.successful_auction_reward_coefficient
         ).multipliedBy(KSM_RESERVATION_AMOUNT);
@@ -76,6 +78,9 @@ const Contributions = {
         record.successful_auction_royalty_coefficient
       ).multipliedBy(invitationContributions);
 
+      // 判断用户是否预约过
+      const ifReserved = await queryIfReserved(account, models);
+
       return {
         ifReserved: ifReserved,
         personalContributions: personalContributions.toFixed(),
@@ -88,8 +93,11 @@ const Contributions = {
       };
     },
     getInvitationCodeByAccount: async (parent, { account }, { models }) => {
+      // 查询一下是否reserve了，如果是的话，就是查询和返回。如果不是的话，就返回none.
       let record = await models.InvitationCodes.findOne({
-        where: { inviter_address: account },
+        where: {
+          $and: [{ inviter_address: account }, { if_authenticated: true }],
+        },
       });
 
       if (record) {
@@ -106,7 +114,9 @@ const Contributions = {
     },
     getAccountByInvitationCode: async (parent, { code }, { models }) => {
       let record = await models.InvitationCodes.findOne({
-        where: { inviter_code: code },
+        where: {
+          $and: [{ inviter_code: code }, { if_authenticated: true }],
+        },
       });
 
       if (record) {
@@ -244,10 +254,14 @@ const Contributions = {
         });
 
         if (!rs) {
+          // 查询一下是否有抓取到预约交易，如果有的话，if_authenticated值为true,否则为false
+          const auth = await authenticateReserveTransaction(account, models);
+
           await models.InvitationCodes.create({
             inviter_address: account,
             inviter_code: newInvitationCode,
             invited_by_address: record.inviter_address,
+            if_authenticated: auth,
           });
           break;
         }

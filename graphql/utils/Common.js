@@ -6,6 +6,7 @@ dotenv.config();
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
 export const KSM_RESERVATION_AMOUNT = 1000000000; // 1^10 = 0.01 KSM
 
+// *************************
 // return bignumber format. Only valid for single layer filed.
 export const getSumOfAFieldFromList = (list, field) => {
   return list
@@ -13,6 +14,7 @@ export const getSumOfAFieldFromList = (list, field) => {
     .reduce((a, b) => a.plus(b), new BigNumber(0));
 };
 
+// *************************
 // 随机数生成底层函数
 const getRandomChars = (randomChars, length) => {
   var result = "";
@@ -49,6 +51,7 @@ export const getRandomCombination = (randomConfig = INIT_RANDOM_CONFIG) => {
   return result;
 };
 
+// *************************
 // campaign表初始化
 const INVITATION_START_TIME = parseInt(process.env.INVITATION_START_TIME);
 const INVITATION_END_TIME = parseInt(process.env.INVITATION_END_TIME);
@@ -91,6 +94,7 @@ export const campaignInfoInitialization = async (models) => {
   await models.Coefficients.create(initCoefficientData);
 };
 
+// *************************
 // 获取个人contributions的总额
 export const getPersonalContributions = async (account, models) => {
   if (!account) return;
@@ -122,12 +126,15 @@ export const getPersonalContributions = async (account, models) => {
   return { personalContributions, personalContributionList };
 };
 
+// *************************
 // 获取某账号下线的contributions的总额
 export const getInvitationData = async (account, models) => {
   if (!account) return;
 
   let condition = {
-    where: { invited_by_address: account },
+    where: {
+      $and: [{ invited_by_address: account }, { if_authenticated: true }],
+    },
     include: [
       {
         model: models.Transactions,
@@ -148,7 +155,9 @@ export const getInvitationData = async (account, models) => {
   }
 
   condition = {
-    where: { invited_by_address: account },
+    where: {
+      $and: [{ invited_by_address: account }, { if_authenticated: true }],
+    },
     raw: true, // 获取object array
   };
   const accountInviteeList = await models.InvitationCodes.findAll(condition);
@@ -161,18 +170,79 @@ export const getInvitationData = async (account, models) => {
   };
 };
 
-// 查询用户是否是在白名单内
+// *************************
+// 查询用户是否是在白名单内。是否在白名单内有两个条件，第1是有邀请码记录。第2是if_authenticated是true的状态。
 export const queryIfReserved = async (account, models) => {
-  const rs = await models.InvitationCodes.findOne({
-    inviter_address: account,
-  });
+  const condition = { where: { inviter_address: account } };
+  const rs = await models.InvitationCodes.findOne(condition);
+
   if (rs) {
-    return true;
+    if (rs.if_authenticated == false) {
+      // 查询有没有符合时间段的交易（1.时间，2.金额）
+      const auth = await authenticateReserveTransaction(account, models);
+      if (auth) {
+        // 修改表格if_authenticated状态，否则不需要动
+        const newData = { if_authenticated: true };
+        await models.InvitationCodes.update(newData, condition);
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      return true;
+    }
   } else {
     return false;
   }
 };
 
+export const authenticateReserveTransaction = async (account, models) => {
+  if (!account) return;
+
+  // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
+  const recordNum = await models.SalpOverviews.count();
+  if (recordNum == 0) {
+    await campaignInfoInitialization(models);
+  }
+
+  const timeRecord = await models.SalpOverviews.findOne({});
+
+  // 获取预约开始和结束时间
+  const invitation_start_time_formatted = sequelize.fn(
+    "to_timestamp",
+    timeRecord.invitation_start_time
+  );
+  const invitation_end_time_formatted = sequelize.fn(
+    "to_timestamp",
+    timeRecord.invitation_end_time
+  );
+
+  let condition = {
+    where: {
+      $and: [
+        { from: account },
+        { to: MULTISIG_ACCOUNT },
+        { time: { $gte: invitation_start_time_formatted } },
+        { time: { $lte: invitation_end_time_formatted } },
+      ],
+    },
+  };
+
+  const rs = await models.Transactions.findAll(condition);
+
+  if (rs.length == 0) {
+    return false;
+  } else {
+    const contributionValue = getSumOfAFieldFromList(rs, "amount");
+    if (contributionValue.isGreaterThanOrEqualTo(KSM_RESERVATION_AMOUNT)) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+
+// *************************
 // 获取个人符合条件，用于计算奖励的contributions。条件有如下几条：
 // 1. 如果用户不在白名单内，正式开投时间 - 结束时间的 个人所有contributions都算进去
 // 2. 如果用户在白名单内，提前开始时间 - 结束时间的 个人所有contributions都算进去

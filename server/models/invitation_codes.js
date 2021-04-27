@@ -15,6 +15,14 @@ const invitation_codes = (sequelize, DataTypes) => {
           notEmpty: true,
         },
       },
+      invited_by_address: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      if_authenticated: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+      },
     },
     {
       underscored: true,

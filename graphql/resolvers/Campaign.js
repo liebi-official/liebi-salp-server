@@ -63,11 +63,6 @@ const Campaign = {
         await campaignInfoInitialization(models);
       }
 
-      // 获取多签账户历史记录余额
-      const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
-        models
-      );
-
       const record = await models.SalpOverviews.findOne();
 
       return {

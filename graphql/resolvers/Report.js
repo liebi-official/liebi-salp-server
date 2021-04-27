@@ -11,8 +11,9 @@ const Report = {
   // ===========================================================================
   Query: {
     getVotersInfo: async (parent, { account }, { models }) => {
-      // 准备邀请人头数据
+      // 准备邀请人头数据，这里必须是有效的人头数据，即必须是if_authenticated为true的记录
       let inviteesData = await models.InvitationCodes.findAll({
+        where: { if_authenticated: true },
         attributes: [
           "invited_by_address",
           [sequelize.fn("count", sequelize.col("inviter_address")), "count"],
