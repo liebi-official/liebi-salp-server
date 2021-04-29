@@ -156,6 +156,11 @@ const Contributions = {
       { account, recordNum },
       { models }
     ) => {
+      // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
+      const num = await models.SalpOverviews.count();
+      if (num == 0) {
+        await campaignInfoInitialization(models);
+      }
       // 查询下线的人头数及总contributions金额
       const invitationResult = await getInvitationData(account, models);
 

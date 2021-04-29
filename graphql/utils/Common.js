@@ -271,14 +271,6 @@ export const authenticateReserveTransaction = async (account, models) => {
 // 2. 如果用户在白名单内，提前开始时间 - 结束时间的 个人所有contributions都算进去
 
 export const getRewardedPersonalContributions = async (account, models) => {
-  if (!account) return;
-
-  // 查询如果没有数据，则读取.env文件，初始化salp_overview和coefficients表格
-  const recordNum = await models.SalpOverviews.count();
-  if (recordNum == 0) {
-    await campaignInfoInitialization(models);
-  }
-
   const timeRecord = await models.SalpOverviews.findOne({});
 
   // 算预约阶段的奖励
