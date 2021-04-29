@@ -17,6 +17,14 @@ const Contributions = {
   // ===========================================================================
   Query: {
     getEarlyBirdData: async (parent, { account }, { models }) => {
+      // 确保Coefficients表有值
+      let recordNum = await models.Coefficients.count();
+      if (recordNum == 0) {
+        await campaignInfoInitialization(models);
+      }
+
+      let record = await models.Coefficients.findOne();
+
       // 判断该账户是否已预约
       const ifReserved = await queryIfReserved(account, models);
 
@@ -26,13 +34,36 @@ const Contributions = {
         models
       );
 
-      // 查询下线的人头数
-      const { numberOfInvitees } = await getInvitationData(account, models);
+      // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
+      const rewardedPersonalContributions = await getRewardedPersonalContributions(
+        account,
+        models
+      );
+
+      const straightReward = new BigNumber(
+        record.straight_reward_coefficient
+      ).multipliedBy(rewardedPersonalContributions);
+
+      // 查询下线的人头数及总contributions金额
+      const {
+        bondList,
+        numberOfInvitees,
+        invitationContributions,
+      } = await getInvitationData(account, models);
+
+      const invitationStraightReward = new BigNumber(
+        record.straight_reward_coefficient
+      )
+        .multipliedBy(record.royalty_coefficient)
+        .multipliedBy(invitationContributions);
 
       return {
         ifReserved: ifReserved,
         personalContributions: personalContributions.toFixed(0),
+        bondList: bondList,
         numberOfInvitees: numberOfInvitees,
+        straightReward: straightReward.toFixed(0),
+        invitationStraightReward: invitationStraightReward.toFixed(0),
       };
     },
     successfulAuctionRewardData: async (parent, { account }, { models }) => {
@@ -44,15 +75,6 @@ const Contributions = {
 
       let record = await models.Coefficients.findOne();
 
-      // 判断该账户是否已锁定过预约的钱
-      const ifAuth = await authenticateReserveTransaction(account, models);
-
-      let reservationReward = new BigNumber(0);
-      if (ifAuth) {
-        reservationReward = new BigNumber(
-          record.successful_auction_reward_coefficient
-        ).multipliedBy(KSM_RESERVATION_AMOUNT);
-      }
       // 查询个人的所有contribution
       const { personalContributions } = await getPersonalContributions(
         account,
@@ -60,9 +82,10 @@ const Contributions = {
       );
 
       // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
-      const {
-        rewardedPersonalContributions,
-      } = await getRewardedPersonalContributions(account, models);
+      const rewardedPersonalContributions = await getRewardedPersonalContributions(
+        account,
+        models
+      );
 
       const successfulAuctionReward = new BigNumber(
         record.successful_auction_reward_coefficient
@@ -74,9 +97,9 @@ const Contributions = {
         invitationContributions,
       } = await getInvitationData(account, models);
 
-      const successfulAuctionRoyalty = new BigNumber(
-        record.successful_auction_royalty_coefficient
-      ).multipliedBy(invitationContributions);
+      const successfulAuctionRoyalty = new BigNumber(record.royalty_coefficient)
+        .multipliedBy(record.successful_auction_reward_coefficient)
+        .multipliedBy(invitationContributions);
 
       // 判断用户是否预约过
       const ifReserved = await queryIfReserved(account, models);
@@ -89,7 +112,6 @@ const Contributions = {
         numberOfInvitees: numberOfInvitees,
         invitationContributions: invitationContributions.toFixed(),
         successfulAuctionRoyalty: successfulAuctionRoyalty.toFixed(),
-        reservationReward: reservationReward.toFixed(),
       };
     },
     getInvitationCodeByAccount: async (parent, { account }, { models }) => {
@@ -129,7 +151,11 @@ const Contributions = {
         };
       }
     },
-    getContributions: async (parent, { account, recordNum }, { models }) => {
+    getInvitationContributionDetails: async (
+      parent,
+      { account, recordNum },
+      { models }
+    ) => {
       // 查询下线的人头数及总contributions金额
       const invitationResult = await getInvitationData(account, models);
 
@@ -138,11 +164,9 @@ const Contributions = {
         invitationContributionList = invitationResult.accountInvitationList.map(
           (rawRs) => {
             return {
-              contributorAddress: rawRs["transactions.from"],
-              amount: rawRs["transactions.amount"],
-              timestamp: new Date(rawRs["transactions.time"])
-                .toISOString()
-                .slice(0, 19),
+              contributorAddress: rawRs["from"],
+              amount: rawRs["amount"],
+              timestamp: new Date(rawRs["time"]).toISOString().slice(0, 19),
               inviterAddress: account,
             };
           }
@@ -156,35 +180,8 @@ const Contributions = {
         );
       }
 
-      // 查询个人的贡献值
-      const personalResult = await getPersonalContributions(account, models);
-
-      let personalContributionList = [];
-      if (personalResult.personalContributionList.length != 0) {
-        personalContributionList = personalResult.personalContributionList.map(
-          (rawRs) => {
-            return {
-              contributorAddress: account,
-              amount: rawRs.amount,
-              timestamp: rawRs.time,
-              inviterAddress: rawRs["invitation_code.invited_by_address"],
-            };
-          }
-        );
-      }
-
-      if (personalContributionList.length > recordNum) {
-        personalContributionList = personalContributionList.slice(0, recordNum);
-      }
-
       return {
-        totalContributions: personalResult.personalContributions.toFixed(0),
-        contributions: personalContributionList,
-        numberOfInvitees: invitationResult.numberOfInvitees,
-        totalInvitationContributions: invitationResult.invitationContributions.toFixed(
-          0
-        ),
-        invitationContributions: invitationContributionList,
+        invitationContributionDetails: invitationContributionList,
       };
     },
     ifReserved: async (parent, { account }, { models }) => {

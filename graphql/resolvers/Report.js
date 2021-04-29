@@ -80,16 +80,6 @@ const Report = {
         return [];
       }
 
-      condition = {
-        raw: true,
-        include: [
-          {
-            model: models.InvitationCodes,
-          },
-        ],
-        order: [["time", "ASC"]], // 按时间升序排列
-      };
-
       let personalFirstVoteObj = {};
       let uniqueVoters = [];
 

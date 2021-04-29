@@ -4,7 +4,15 @@ const Contributions = gql`
   type EarlyBirdData {
     ifReserved: Boolean # 该账户是否已预约
     personalContributions: String # 用于展示vsKSM有多少
-    numberOfInvitees: Int
+    bondList: [InviteeInfo] # 邀请者列表
+    numberOfInvitees: Int # 邀请的地址数
+    straightReward: String # 本人投票直接获得的奖励，无论是否竞拍成功
+    invitationStraightReward: String # 邀请获得的奖励，无论是否竞拍成功
+  }
+
+  type InviteeInfo {
+    bondAddress: String
+    bondTime: String
   }
 
   type SuccessfulAuctionReward {
@@ -15,7 +23,6 @@ const Contributions = gql`
     numberOfInvitees: Int
     invitationContributions: String
     successfulAuctionRoyalty: String
-    reservationReward: String
   }
 
   type InvitationCodeData {
@@ -29,11 +36,7 @@ const Contributions = gql`
   }
 
   type ContributionsData {
-    totalContributions: String
-    contributions: [Contribution]
-    numberOfInvitees: Int
-    totalInvitationContributions: String
-    invitationContributions: [Contribution]
+    invitationContributionDetails: [Contribution]
   }
 
   type Contribution {
@@ -58,7 +61,10 @@ const Contributions = gql`
     # 通过邀请码查询用户账号
     getAccountByInvitationCode(code: String!): AccountByInvitation
     # 查询contribution明细
-    getContributions(account: String!, recordNum: Int = 50): ContributionsData
+    getInvitationContributionDetails(
+      account: String!
+      recordNum: Int = 50
+    ): ContributionsData
     # 查询用户是否已预约，即是否在白名单内
     ifReserved(account: String!): Boolean
   }

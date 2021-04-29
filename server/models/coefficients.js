@@ -2,15 +2,22 @@ const coefficients = (sequelize, DataTypes) => {
   const Coefficients = sequelize.define(
     "coefficients",
     {
-      successful_auction_reward_coefficient: {
-        type: DataTypes.STRING,
+      straight_reward_coefficient: {
+        type: DataTypes.DOUBLE,
         allowNull: false,
         validate: {
           notEmpty: true,
         },
       },
-      successful_auction_royalty_coefficient: {
-        type: DataTypes.STRING,
+      successful_auction_reward_coefficient: {
+        type: DataTypes.DOUBLE,
+        allowNull: false,
+        validate: {
+          notEmpty: true,
+        },
+      },
+      royalty_coefficient: {
+        type: DataTypes.DOUBLE,
         allowNull: false,
         validate: {
           notEmpty: true,

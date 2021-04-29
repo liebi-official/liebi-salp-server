@@ -61,12 +61,13 @@ const SALP_WHITELIST_AHEAD_HOURS = parseInt(
 const SALP_START_TIME = parseInt(process.env.SALP_START_TIME);
 const SALP_END_TIME = parseInt(process.env.SALP_END_TIME);
 const SALP_TARGET = process.env.SALP_TARGET;
+const STRAIGHT_REWARD_COEFFICIENT = parseFloat(
+  process.env.STRAIGHT_REWARD_COEFFICIENT
+);
 const SUCCESSFUL_AUCTION_REWARD_COEFFICIENT = parseFloat(
   process.env.SUCCESSFUL_AUCTION_REWARD_COEFFICIENT
 );
-const SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT = parseFloat(
-  process.env.SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT
-);
+const ROYALTY_COEFFICIENT = parseFloat(process.env.ROYALTY_COEFFICIENT);
 
 const SECONDS_PER_HOUR = 60 * 60;
 
@@ -87,8 +88,9 @@ export const campaignInfoInitialization = async (models) => {
 
   // 默认初始值
   const initCoefficientData = {
+    straight_reward_coefficient: STRAIGHT_REWARD_COEFFICIENT,
     successful_auction_reward_coefficient: SUCCESSFUL_AUCTION_REWARD_COEFFICIENT,
-    successful_auction_royalty_coefficient: SUCCESSFUL_AUCTION_ROYALTY_COEFFICIENT,
+    royalty_coefficient: ROYALTY_COEFFICIENT,
   };
 
   await models.Coefficients.create(initCoefficientData);
@@ -129,44 +131,73 @@ export const getPersonalContributions = async (account, models) => {
 // *************************
 // 获取某账号下线的contributions的总额
 export const getInvitationData = async (account, models) => {
-  if (!account) return;
-
   let condition = {
     where: {
       $and: [{ invited_by_address: account }, { if_authenticated: true }],
     },
-    include: [
-      {
-        model: models.Transactions,
-        right: true, // will create a right join
-      },
-    ],
     raw: true, // 获取object array
   };
 
-  const accountInvitationList = await models.InvitationCodes.findAll(condition);
+  const accountInviteeList = await models.InvitationCodes.findAll(condition);
+  let uniqueInvitees = accountInviteeList.length;
+  const reserveContributions = new BigNumber(uniqueInvitees).multipliedBy(
+    KSM_RESERVATION_AMOUNT
+  );
+
+  const inviteeList = accountInviteeList.map((item) => {
+    return item["inviter_address"];
+  });
+
+  const firstVoteObject = await getFirstVoteObject(models, inviteeList);
+  const bondList = Object.keys(firstVoteObject).map((item, idx) => {
+    return {
+      bondAddress: item,
+      bondTime: Object.values(firstVoteObject)[idx],
+    };
+  });
+
+  // 获取各种时间
+  const timeRecord = await models.SalpOverviews.findOne({});
+  const whitelist_start_time_formatted = await sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_whitelist_start_time
+  );
+
+  const end_time_formatted = sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_end_time
+  );
+
+  // 计算下线在正式投票阶段的贡献额
+  condition = {
+    where: {
+      $and: [
+        { time: { $gte: whitelist_start_time_formatted } },
+        { time: { $lte: end_time_formatted } },
+        { from: inviteeList },
+      ],
+    },
+    raw: true, // 获取object array
+  };
+
+  const accountInvitationList = await models.Transactions.findAll(condition);
 
   let invitationContributions = new BigNumber(0);
   if (accountInvitationList.length != 0) {
     invitationContributions = getSumOfAFieldFromList(
       accountInvitationList,
-      "transactions.amount"
+      "amount"
     );
   }
 
-  condition = {
-    where: {
-      $and: [{ invited_by_address: account }, { if_authenticated: true }],
-    },
-    raw: true, // 获取object array
-  };
-  const accountInviteeList = await models.InvitationCodes.findAll(condition);
-  let uniqueInvitees = accountInviteeList.length;
+  // 投票阶段的投票金额+预约每个人头算0.01个KSM = 总可计算金额
+  invitationContributions = invitationContributions.plus(reserveContributions);
 
   return {
     numberOfInvitees: uniqueInvitees,
     invitationContributions,
     accountInvitationList,
+    bondList: bondList,
   };
 };
 
@@ -197,14 +228,6 @@ export const queryIfReserved = async (account, models) => {
 };
 
 export const authenticateReserveTransaction = async (account, models) => {
-  if (!account) return;
-
-  // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
-  const recordNum = await models.SalpOverviews.count();
-  if (recordNum == 0) {
-    await campaignInfoInitialization(models);
-  }
-
   const timeRecord = await models.SalpOverviews.findOne({});
 
   // 获取预约开始和结束时间
@@ -250,13 +273,20 @@ export const authenticateReserveTransaction = async (account, models) => {
 export const getRewardedPersonalContributions = async (account, models) => {
   if (!account) return;
 
-  // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
+  // 查询如果没有数据，则读取.env文件，初始化salp_overview和coefficients表格
   const recordNum = await models.SalpOverviews.count();
   if (recordNum == 0) {
     await campaignInfoInitialization(models);
   }
 
   const timeRecord = await models.SalpOverviews.findOne({});
+
+  // 算预约阶段的奖励
+  const ifReserved = await queryIfReserved(account, models);
+  let reservationContributions = new BigNumber(0);
+  if (ifReserved) {
+    reservationContributions = new BigNumber(KSM_RESERVATION_AMOUNT);
+  }
 
   // 获取各种时间
   const whitelist_start_time_formatted = await sequelize.fn(
@@ -286,15 +316,10 @@ export const getRewardedPersonalContributions = async (account, models) => {
       ],
     },
     raw: true,
-    include: [
-      {
-        model: models.InvitationCodes,
-      },
-    ],
   };
 
   // 判断该账户是否已预约，根据预约的情况，从不同的时间开始计算参与奖励的contributions
-  const ifReserved = await queryIfReserved(account, models);
+
   if (ifReserved) {
     condition.where["$and"].push({
       time: { $gte: whitelist_start_time_formatted },
@@ -310,10 +335,7 @@ export const getRewardedPersonalContributions = async (account, models) => {
   );
 
   if (rewardedPersonalContributionList.length == 0) {
-    return {
-      rewardedPersonalContributions: new BigNumber(0),
-      rewardedPersonalContributionList: [],
-    };
+    return reservationContributions;
   }
 
   const rewardedPersonalContributions = getSumOfAFieldFromList(
@@ -321,5 +343,28 @@ export const getRewardedPersonalContributions = async (account, models) => {
     "amount"
   );
 
-  return { rewardedPersonalContributions, rewardedPersonalContributionList };
+  return rewardedPersonalContributions.plus(reservationContributions);
+};
+
+// **************************
+// 获取传入账户第一次投票的时间
+export const getFirstVoteObject = async (models, inviteeList) => {
+  const condition = {
+    where: {
+      $and: [{ to: MULTISIG_ACCOUNT }, { from: inviteeList }],
+    },
+    raw: true,
+    order: [["time", "ASC"]], // 按时间升序排列
+  };
+
+  const contributionList = await models.Transactions.findAll(condition);
+
+  let personalFirstVoteObj = {};
+  for (const record of contributionList) {
+    if (!personalFirstVoteObj[record.from]) {
+      personalFirstVoteObj[record.from] = record.time;
+    }
+  }
+
+  return personalFirstVoteObj;
 };
