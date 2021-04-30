@@ -8,6 +8,7 @@ const Contributions = gql`
     numberOfInvitees: Int # 邀请的地址数
     straightReward: String # 本人投票直接获得的奖励，无论是否竞拍成功
     invitationStraightReward: String # 邀请获得的奖励，无论是否竞拍成功
+    codeExtraInstantReward: String # 因为绑定过邀请人而获得的即时的额外奖励
   }
 
   type InviteeInfo {
@@ -46,6 +47,10 @@ const Contributions = gql`
     inviterAddress: String
   }
 
+  type BidingStatus {
+    status: String # 有三种状态：ok, exist, invalid_inviter_code
+  }
+
   input CodeGenerationInput {
     account: String!
     invited_by_code: String!
@@ -72,6 +77,7 @@ const Contributions = gql`
   type Mutation {
     # 预约：进入白名单+生成邀请码
     generateInvitationCode(input: CodeGenerationInput): InvitationCodeData
+    bindInviter(input: CodeGenerationInput): BidingStatus
   }
 `;
 

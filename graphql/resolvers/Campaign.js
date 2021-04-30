@@ -75,6 +75,22 @@ const Campaign = {
         serverTime: Math.round(new Date().getTime() / 1000),
       };
     },
+    getCoefficients: async (parent, {}, { models }) => {
+      // 确保Coefficients表有值
+      let recordNum = await models.Coefficients.count();
+      if (recordNum == 0) {
+        await campaignInfoInitialization(models);
+      }
+
+      let record = await models.Coefficients.findOne({});
+
+      return {
+        straightRewardCoefficient: record.straight_reward_coefficient,
+        successfulAuctionRewardCoefficient:
+          record.successful_auction_reward_coefficient,
+        royaltyCoefficient: record.royalty_coefficient,
+      };
+    },
   },
 };
 

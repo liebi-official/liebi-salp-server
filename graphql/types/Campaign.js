@@ -15,9 +15,16 @@ const Campaign = gql`
     serverTime: Int
   }
 
+  type CoefficientList {
+    straightRewardCoefficient: Float
+    successfulAuctionRewardCoefficient: Float
+    royaltyCoefficient: Float
+  }
+
   type Query {
     getCampaignProgress: Progress
     getTimetable: Timetable
+    getCoefficients: CoefficientList
   }
 `;
 

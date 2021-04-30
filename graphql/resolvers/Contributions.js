@@ -57,6 +57,21 @@ const Contributions = {
         .multipliedBy(record.royalty_coefficient)
         .multipliedBy(invitationContributions);
 
+      // 如果该用户绑定了邀请人，则可获得额外的10%奖励
+      let codeExtraInstantReward = new BigNumber(0);
+
+      // 看是否在表里，在表里就是绑定过邀请码的
+      const condition = {
+        where: { inviter_address: account },
+        raw: true, // 获取object array
+      };
+
+      const rs = await models.InvitationCodes.findAll(condition);
+      if (rs) {
+        // 也是获得应得即时奖励金额的10%，与邀请人获得的邀请奖励是一样的
+        codeExtraInstantReward = invitationStraightReward;
+      }
+
       return {
         ifReserved: ifReserved,
         personalContributions: personalContributions.toFixed(0),
@@ -64,6 +79,7 @@ const Contributions = {
         numberOfInvitees: numberOfInvitees,
         straightReward: straightReward.toFixed(0),
         invitationStraightReward: invitationStraightReward.toFixed(0),
+        codeExtraInstantReward: codeExtraInstantReward.toFixed(0),
       };
     },
     successfulAuctionRewardData: async (parent, { account }, { models }) => {
@@ -208,28 +224,38 @@ const Contributions = {
         await campaignInfoInitialization(models);
       }
 
-      // 检查账户是否已经生成过邀请码
+      // 判断邀请人的邀请码是否有效。无效则返回邀请人无效
+      let inviteRecord = await models.InvitationCodes.findOne({
+        where: { inviter_code: invited_by_code },
+      });
+
+      if (!inviteRecord) {
+        return {
+          status: "invalid_inviter_code",
+        };
+      }
+
+      // 再检查账户是否已经生成过邀请码
       let record = await models.InvitationCodes.findOne({
         where: { inviter_address: account },
       });
 
-      // status值为"new", "existing", "none", "invalid_inviter_code", "invalid_code_generation_time", 中的一种
+      // status值为"new", "existing", "none", "invalid_inviter_code", "inviter_code_different_from_previous","invalid_code_generation_time", 中的一种
       if (record) {
-        return {
-          invitationCode: record.inviter_code,
-          status: "existing",
-        };
-      }
-
-      // 再判断邀请人的邀请码是否有效。无效则返回邀请人无效
-      record = await models.InvitationCodes.findOne({
-        where: { inviter_code: invited_by_code },
-      });
-
-      if (!record) {
-        return {
-          status: "invalid_inviter_code",
-        };
+        if (record.inviter_code) {
+          return {
+            invitationCode: record.inviter_code,
+            status: "existing",
+          };
+        } else {
+          // 说明先绑定了，但没成生成邀请码
+          if (inviteRecord.inviter_code != invited_by_code) {
+            // 原来绑定用的邀请人代码跟现在传入的不一样
+            return {
+              status: "inviter_code_different_from_previous",
+            };
+          }
+        }
       }
 
       // 最后判断是否处于邀请码生成的活动时间内，如果不是，则返回不在有效生成时间内
@@ -257,12 +283,13 @@ const Contributions = {
 
         if (!rs) {
           // 查询一下是否有抓取到预约交易，如果有的话，if_authenticated值为true,否则为false
+          // 原来绑定过就更新，没绑定过就插入一条新记录
           const auth = await authenticateReserveTransaction(account, models);
 
-          await models.InvitationCodes.create({
+          await models.InvitationCodes.upsert({
             inviter_address: account,
             inviter_code: newInvitationCode,
-            invited_by_address: record.inviter_address,
+            invited_by_address: inviteRecord.inviter_address,
             if_authenticated: auth,
           });
           break;
@@ -276,6 +303,49 @@ const Contributions = {
       return {
         invitationCode: newRecord.inviter_code,
         status: "new",
+      };
+    },
+    bindInviter: async (parent, { input }, { models }) => {
+      let { account, invited_by_code } = input;
+
+      // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
+      const recordNum = await models.SalpOverviews.count();
+      if (recordNum == 0) {
+        await campaignInfoInitialization(models);
+      }
+
+      // 检查账户是否有绑定过邀请码，如果已绑定，刚返回错误
+      let record = await models.InvitationCodes.findOne({
+        where: { inviter_address: account },
+      });
+
+      // status值为"ok", "exist", "none", "invalid_inviter_code", 中的一种
+      if (record) {
+        return {
+          status: "exist",
+        };
+      }
+
+      // 判断邀请人的邀请码是否有效。无效则返回邀请人无效
+      let inviteRecord = await models.InvitationCodes.findOne({
+        where: { inviter_code: invited_by_code },
+      });
+
+      if (!inviteRecord) {
+        return {
+          status: "invalid_inviter_code",
+        };
+      }
+
+      await models.InvitationCodes.create({
+        inviter_address: account,
+        inviter_code: null,
+        invited_by_address: inviteRecord.inviter_address,
+        if_authenticated: false,
+      });
+
+      return {
+        status: "ok",
       };
     },
   },

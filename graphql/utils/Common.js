@@ -131,22 +131,64 @@ export const getPersonalContributions = async (account, models) => {
 // *************************
 // 获取某账号下线的contributions的总额
 export const getInvitationData = async (account, models) => {
-  let condition = {
+  // 获取各种时间
+  const timeRecord = await models.SalpOverviews.findOne({});
+  const whitelist_start_time_formatted = await sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_whitelist_start_time
+  );
+
+  const start_time_formatted = sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_start_time
+  );
+
+  const end_time_formatted = sequelize.fn(
+    "to_timestamp",
+    timeRecord.salp_end_time
+  );
+
+  // 分两批计算，第一批为预约过的被邀请人，第二批为未预约过的被邀请人。原因是两者的开始计算投票金额时间不一样，而且算预约奖励人头也不一样
+
+  //第一批，已经预约过的被邀请人
+  let reservedCondition = {
     where: {
-      $and: [{ invited_by_address: account }, { if_authenticated: true }],
+      $and: [{ invited_by_address: account }, { if_authenticated: true }], // 被邀请的账户，无论被邀请账户是否预约过，他的投票都算进去别人的邀请金额里面
     },
     raw: true, // 获取object array
   };
 
-  const accountInviteeList = await models.InvitationCodes.findAll(condition);
-  let uniqueInvitees = accountInviteeList.length;
-  const reserveContributions = new BigNumber(uniqueInvitees).multipliedBy(
+  const reservedInviteeList = await models.InvitationCodes.findAll(
+    reservedCondition
+  );
+  let reservedInvitees = reservedInviteeList.length;
+  const reserveContributions = new BigNumber(reservedInvitees).multipliedBy(
     KSM_RESERVATION_AMOUNT
   );
 
-  const inviteeList = accountInviteeList.map((item) => {
+  const reservedInviteeArray = reservedInviteeList.map((item) => {
     return item["inviter_address"];
   });
+
+  //第二批，没预约过的被邀请人
+  let unreservedCondition = {
+    where: {
+      $and: [{ invited_by_address: account }, { if_authenticated: false }], // 被邀请的账户，无论被邀请账户是否预约过，他的投票都算进去别人的邀请金额里面
+    },
+    raw: true, // 获取object array
+  };
+
+  const unreservedInviteeList = await models.InvitationCodes.findAll(
+    unreservedCondition
+  );
+  let unreservedInvitees = unreservedInviteeList.length;
+
+  const unreservedInviteeArray = unreservedInviteeList.map((item) => {
+    return item["inviter_address"];
+  });
+
+  // 邀请人总列表：预约邀请人 + 非预约邀请人
+  const inviteeList = reservedInviteeArray.concat(unreservedInviteeArray);
 
   const firstVoteObject = await getFirstVoteObject(models, inviteeList);
   const bondList = Object.keys(firstVoteObject).map((item, idx) => {
@@ -156,25 +198,24 @@ export const getInvitationData = async (account, models) => {
     };
   });
 
-  // 获取各种时间
-  const timeRecord = await models.SalpOverviews.findOne({});
-  const whitelist_start_time_formatted = await sequelize.fn(
-    "to_timestamp",
-    timeRecord.salp_whitelist_start_time
-  );
-
-  const end_time_formatted = sequelize.fn(
-    "to_timestamp",
-    timeRecord.salp_end_time
-  );
-
   // 计算下线在正式投票阶段的贡献额
-  condition = {
+  let condition = {
     where: {
-      $and: [
-        { time: { $gte: whitelist_start_time_formatted } },
-        { time: { $lte: end_time_formatted } },
-        { from: inviteeList },
+      $or: [
+        {
+          $and: [
+            { time: { $gte: whitelist_start_time_formatted } },
+            { time: { $lte: end_time_formatted } },
+            { from: reservedInviteeArray },
+          ],
+        },
+        {
+          $and: [
+            { time: { $gte: start_time_formatted } },
+            { time: { $lte: end_time_formatted } },
+            { from: unreservedInviteeArray },
+          ],
+        },
       ],
     },
     raw: true, // 获取object array
@@ -194,7 +235,7 @@ export const getInvitationData = async (account, models) => {
   invitationContributions = invitationContributions.plus(reserveContributions);
 
   return {
-    numberOfInvitees: uniqueInvitees,
+    numberOfInvitees: inviteeList.length,
     invitationContributions,
     accountInvitationList,
     bondList: bondList,
