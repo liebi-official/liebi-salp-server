@@ -55,7 +55,7 @@ export const getRandomCombination = (randomConfig = INIT_RANDOM_CONFIG) => {
 // campaign表初始化
 const INVITATION_START_TIME = parseInt(process.env.INVITATION_START_TIME);
 const INVITATION_END_TIME = parseInt(process.env.INVITATION_END_TIME);
-const SALP_WHITELIST_AHEAD_HOURS = parseInt(
+const SALP_WHITELIST_AHEAD_HOURS = parseFloat(
   process.env.SALP_WHITELIST_AHEAD_HOURS
 );
 const SALP_START_TIME = parseInt(process.env.SALP_START_TIME);
