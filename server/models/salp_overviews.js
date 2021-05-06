@@ -29,10 +29,6 @@ const salp_overviews = (sequelize, DataTypes) => {
       // 预约的白名单用户投票开始时间
       salp_whitelist_start_time: {
         type: DataTypes.INTEGER,
-        allowNull: false,
-        validate: {
-          len: [10, 10],
-        },
       },
       // 投票开始时间
       salp_start_time: {
