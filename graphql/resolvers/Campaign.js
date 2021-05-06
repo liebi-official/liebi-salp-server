@@ -58,8 +58,8 @@ const Campaign = {
     },
     getTimetable: async (parent, {}, { models }) => {
       // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
-      const recordNum = await models.SalpOverviews.findOne();
-      if (!recordNum) {
+      const recordNum = await models.SalpOverviews.count();
+      if (recordNum == 0) {
         await campaignInfoInitialization(models);
       }
 
