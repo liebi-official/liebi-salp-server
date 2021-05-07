@@ -72,6 +72,7 @@ const Contributions = gql`
     ): ContributionsData
     # 查询用户是否已预约，即是否在白名单内
     ifReserved(account: String!): Boolean
+    ifBind(account: String!): Boolean
   }
 
   type Mutation {

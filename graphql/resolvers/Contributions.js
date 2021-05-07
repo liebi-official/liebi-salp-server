@@ -209,6 +209,18 @@ const Contributions = {
       // 查询个人的贡献值
       return await queryIfReserved(account, models);
     },
+    ifBind: async (parent, { account }, { models }) => {
+      // 查询该账户是否有邀请人，有的话返回true，没有的话，返回false
+      const condition = { where: { inviter_address: account } };
+      const rs = await models.InvitationCodes.findOne(condition);
+
+      if (rs) {
+        // 如果有值，说明是有绑定请人的，有表里有记录
+        return true;
+      } else {
+        return false;
+      }
+    },
   },
 
   // =============================================================================
