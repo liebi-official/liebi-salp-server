@@ -211,14 +211,30 @@ const Contributions = {
     },
     ifBind: async (parent, { account }, { models }) => {
       // 查询该账户是否有邀请人，有的话返回true，没有的话，返回false
-      const condition = { where: { inviter_address: account } };
+      let condition = { where: { inviter_address: account } };
       const rs = await models.InvitationCodes.findOne(condition);
 
       if (rs) {
         // 如果有值，说明是有绑定请人的，有表里有记录
-        return true;
+        if (rs.invited_by_address) {
+          condition = { where: { inviter_address: rs.invited_by_address } };
+          const inviterInfo = await models.InvitationCodes.findOne(condition);
+
+          return {
+            invitationCode: inviterInfo.inviter_code,
+            status: "existing",
+          };
+        } else {
+          return {
+            invitationCode: null,
+            status: "source",
+          };
+        }
       } else {
-        return false;
+        return {
+          invitationCode: null,
+          status: "none",
+        };
       }
     },
   },

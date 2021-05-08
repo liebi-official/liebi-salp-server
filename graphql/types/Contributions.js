@@ -28,7 +28,7 @@ const Contributions = gql`
 
   type InvitationCodeData {
     invitationCode: String
-    # status值为"new", "existing", "none", "invalid_inviter_code", "invalid_code_generation_time"
+    # status值为"new", "existing", "none", "invalid_inviter_code", "invalid_code_generation_time", "source"
     status: String
   }
 
@@ -72,7 +72,7 @@ const Contributions = gql`
     ): ContributionsData
     # 查询用户是否已预约，即是否在白名单内
     ifReserved(account: String!): Boolean
-    ifBind(account: String!): Boolean
+    ifBind(account: String!): InvitationCodeData
   }
 
   type Mutation {
