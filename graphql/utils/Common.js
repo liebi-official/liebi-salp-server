@@ -4,7 +4,7 @@ import { sequelize } from "../../server/models";
 dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
-export const KSM_RESERVATION_AMOUNT = 1000000000; // 1^10 = 0.01 KSM
+export const KSM_RESERVATION_AMOUNT = 10000000000; // 1^10 = 0.01 KSM
 
 // *************************
 // return bignumber format. Only valid for single layer filed.
