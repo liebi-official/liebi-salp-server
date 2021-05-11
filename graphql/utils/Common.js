@@ -219,6 +219,7 @@ export const getInvitationData = async (account, models) => {
       ],
     },
     raw: true, // 获取object array
+    order: [["time", "DESC"]], // 按时间升序排列
   };
 
   const accountInvitationList = await models.Transactions.findAll(condition);
