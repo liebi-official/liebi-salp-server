@@ -67,9 +67,10 @@ const Contributions = {
       };
 
       const rs = await models.InvitationCodes.findAll(condition);
+
       if (rs) {
         // 也是获得应得即时奖励金额的10%，与邀请人获得的邀请奖励是一样的
-        codeExtraInstantReward = invitationStraightReward;
+        codeExtraInstantReward = straightReward.multipliedBy(record.royalty_coefficient);
       }
 
       return {
