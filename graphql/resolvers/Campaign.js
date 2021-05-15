@@ -49,11 +49,20 @@ const Campaign = {
 
       const record = await models.SalpOverviews.findOne();
 
+      // 获取所有参与投票的人数
+      const condition = {
+        distinct: true,
+        col: "from"
+      };
+
+      const votersNum = await models.Transactions.count(condition);
+
       return {
         targets: record.channel_target,
         multisigAccountHistoricalBalance: multisig_account_historical_balance.toFixed(
           0
         ),
+        votersNum
       };
     },
     getTimetable: async (parent, {}, { models }) => {

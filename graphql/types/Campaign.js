@@ -4,6 +4,7 @@ const Campaign = gql`
   type Progress {
     targets: String
     multisigAccountHistoricalBalance: String
+    votersNum: Int
   }
 
   type Timetable {
