@@ -29,10 +29,7 @@ const Contributions = {
       const ifReserved = await queryIfReserved(account, models);
 
       // 查询个人的contribution，可用于展示vsKSM有多少
-      const { personalContributions } = await getPersonalContributions(
-        account,
-        models
-      );
+      const personalContributions = await getPersonalContributions(account, models);
 
       // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
       const rewardedPersonalContributions = await getRewardedPersonalContributions(
@@ -66,9 +63,9 @@ const Contributions = {
         raw: true, // 获取object array
       };
 
-      const rs = await models.InvitationCodes.findAll(condition);
+      const recordCount = await models.InvitationCodes.count(condition);
 
-      if (rs.length) {
+      if (recordCount != 0) {
         // 也是获得应得即时奖励金额的10%，与邀请人获得的邀请奖励是一样的
         codeExtraInstantReward = straightReward.multipliedBy(record.royalty_coefficient);
       }
@@ -93,10 +90,7 @@ const Contributions = {
       let record = await models.Coefficients.findOne();
 
       // 查询个人的所有contribution
-      const { personalContributions } = await getPersonalContributions(
-        account,
-        models
-      );
+      const personalContributions = await getPersonalContributions(account, models);
 
       // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
       const rewardedPersonalContributions = await getRewardedPersonalContributions(

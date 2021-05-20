@@ -4,26 +4,20 @@ import {
 } from "../utils/Common";
 import dotenv from "dotenv";
 import BigNumber from "bignumber.js";
+import { sequelize } from "../../server/models";
+import { QueryTypes } from 'sequelize';
 dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
 
 const getMultisigAccountHistoricalBalance = async (models) => {
   // 只要是转账到多签账户的交易都计算入内
-  const condition = {
-    where: { to: MULTISIG_ACCOUNT },
-    raw: true,
-  };
-
-  const historicalTransferList = await models.Transactions.findAll(condition);
+  const queryString = `WHERE "to" = '${MULTISIG_ACCOUNT}'`;
+  const result = await sequelize.query(`SELECT SUM(amount::bigint) FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
 
   let multisigAccountHistoricalBalance = new BigNumber(0);
-
-  if (historicalTransferList.length != 0) {
-    multisigAccountHistoricalBalance = getSumOfAFieldFromList(
-      historicalTransferList,
-      "amount"
-    );
+  if (result[0].sum){
+    multisigAccountHistoricalBalance = new BigNumber(result[0].sum);
   }
 
   return multisigAccountHistoricalBalance;
@@ -43,9 +37,9 @@ const Campaign = {
       }
 
       // 获取多签账户历史记录余额
-      // const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
-      //   models
-      // );
+      const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
+        models
+      );
 
       const record = await models.SalpOverviews.findOne();
 
@@ -59,10 +53,9 @@ const Campaign = {
 
       return {
         targets: record.channel_target,
-        // multisigAccountHistoricalBalance: multisig_account_historical_balance.toFixed(
-        //   0
-        // ),
-        multisigAccountHistoricalBalance: "0",
+        multisigAccountHistoricalBalance: multisig_account_historical_balance.toFixed(
+          0
+        ),
         votersNum
       };
     },
