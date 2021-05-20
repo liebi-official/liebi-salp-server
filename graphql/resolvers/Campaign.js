@@ -43,9 +43,9 @@ const Campaign = {
       }
 
       // 获取多签账户历史记录余额
-      const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
-        models
-      );
+      // const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
+      //   models
+      // );
 
       const record = await models.SalpOverviews.findOne();
 
@@ -59,9 +59,10 @@ const Campaign = {
 
       return {
         targets: record.channel_target,
-        multisigAccountHistoricalBalance: multisig_account_historical_balance.toFixed(
-          0
-        ),
+        // multisigAccountHistoricalBalance: multisig_account_historical_balance.toFixed(
+        //   0
+        // ),
+        multisigAccountHistoricalBalance: "0",
         votersNum
       };
     },
