@@ -158,19 +158,23 @@ export const getInvitationData = async (account, models) => {
   // 邀请人总列表：预约邀请人 + 非预约邀请人
   const inviteeList = reservedInviteeList.concat(unreservedInviteeList);
 
-  // 先排序，然后选每个人的最早的投票记录
-  let bondListQueryString = `WHERE "to" = '${MULTISIG_ACCOUNT}' AND "from" IN `;
-  bondListQueryString += getStringQueryList(inviteeList);
-  bondListQueryString += ` ORDER BY "from", "time" ASC`;
+  let bondList = [];
+    if (inviteeList.length != 0) {
+    // 先排序，然后选每个人的最早的投票记录
+    let bondListQueryString = `WHERE "to" = '${MULTISIG_ACCOUNT}' AND "from" IN `;
+    bondListQueryString += getStringQueryList(inviteeList);
+    bondListQueryString += ` ORDER BY "from", "time" ASC`;
 
-  const contributionList = await sequelize.query(`SELECT DISTINCT on ("from") "from", "time" FROM transactions ${bondListQueryString} `, { type: QueryTypes.SELECT });
+    const contributionList = await sequelize.query(`SELECT DISTINCT on ("from") "from", "time" FROM transactions ${bondListQueryString} `, { type: QueryTypes.SELECT });
 
-  const bondList = contributionList.map((item) => {
-    return {
-      bondAddress: item.from,
-      bondTime: item.time,
-    };
-  });
+    bondList = contributionList.map((item) => {
+      return {
+        bondAddress: item.from,
+        bondTime: item.time,
+      };
+    });
+  }
+
 
   // 计算下线在正式投票阶段的贡献额
   // 已预约的贡献额
