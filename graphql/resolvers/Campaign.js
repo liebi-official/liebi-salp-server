@@ -1,6 +1,5 @@
 import {
   campaignInfoInitialization,
-  getSumOfAFieldFromList,
 } from "../utils/Common";
 import dotenv from "dotenv";
 import BigNumber from "bignumber.js";
@@ -29,17 +28,12 @@ const Campaign = {
   // ? QUERIES
   // ===========================================================================
   Query: {
-    getCampaignProgress: async (parent, {}, { models }) => {
+    getCampaignInfo: async (parent, {}, { models }) => {
       // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
       const recordNum = await models.SalpOverviews.count();
       if (recordNum == 0) {
         await campaignInfoInitialization(models);
       }
-
-      // 获取多签账户历史记录余额
-      const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
-        models
-      );
 
       const record = await models.SalpOverviews.findOne();
 
@@ -53,11 +47,16 @@ const Campaign = {
 
       return {
         targets: record.channel_target,
-        multisigAccountHistoricalBalance: multisig_account_historical_balance.toFixed(
-          0
-        ),
         votersNum
       };
+    },
+    getFundingProgress: async (parent, {}, { models }) => {
+      // 获取多签账户历史记录余额
+      const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
+        models
+      );
+
+      return multisig_account_historical_balance.toFixed();
     },
     getTimetable: async (parent, {}, { models }) => {
       // 查询如果没有数据，则读取.env文件，初始化salp_overview表格

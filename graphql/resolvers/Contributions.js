@@ -16,7 +16,7 @@ const Contributions = {
   // ? QUERIES
   // ===========================================================================
   Query: {
-    getEarlyBirdData: async (parent, { account }, { models }) => {
+    getSelfReward: async (parent, { account }, { models }) => {
       // 确保Coefficients表有值
       let recordNum = await models.Coefficients.count();
       if (recordNum == 0) {
@@ -24,9 +24,6 @@ const Contributions = {
       }
 
       let record = await models.Coefficients.findOne();
-
-      // 判断该账户是否已预约
-      const ifReserved = await queryIfReserved(account, models);
 
       // 查询个人的contribution，可用于展示vsKSM有多少
       const personalContributions = await getPersonalContributions(account, models);
@@ -41,18 +38,9 @@ const Contributions = {
         record.straight_reward_coefficient
       ).multipliedBy(rewardedPersonalContributions);
 
-      // 查询下线的人头数及总contributions金额
-      const {
-        bondList,
-        numberOfInvitees,
-        invitationContributions,
-      } = await getInvitationData(account, models);
-
-      const invitationStraightReward = new BigNumber(
-        record.straight_reward_coefficient
-      )
-        .multipliedBy(record.royalty_coefficient)
-        .multipliedBy(invitationContributions);
+      const successfulAuctionReward = new BigNumber(
+        record.successful_auction_reward_coefficient
+      ).multipliedBy(rewardedPersonalContributions);
 
       // 如果该用户绑定了邀请人，则可获得额外的10%奖励
       let codeExtraInstantReward = new BigNumber(0);
@@ -71,16 +59,14 @@ const Contributions = {
       }
 
       return {
-        ifReserved: ifReserved,
         personalContributions: personalContributions.toFixed(0),
-        bondList: bondList,
-        numberOfInvitees: numberOfInvitees,
+        rewardedPersonalContributions: rewardedPersonalContributions.toFixed(0),
         straightReward: straightReward.toFixed(0),
-        invitationStraightReward: invitationStraightReward.toFixed(0),
         codeExtraInstantReward: codeExtraInstantReward.toFixed(0),
+        successfulAuctionReward: successfulAuctionReward.toFixed(),
       };
     },
-    successfulAuctionRewardData: async (parent, { account }, { models }) => {
+    getInvitingReward: async (parent, { account }, { models }) => {
       // 确保Coefficients表有值
       let recordNum = await models.Coefficients.count();
       if (recordNum == 0) {
@@ -89,39 +75,28 @@ const Contributions = {
 
       let record = await models.Coefficients.findOne();
 
-      // 查询个人的所有contribution
-      const personalContributions = await getPersonalContributions(account, models);
-
-      // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
-      const rewardedPersonalContributions = await getRewardedPersonalContributions(
-        account,
-        models
-      );
-
-      const successfulAuctionReward = new BigNumber(
-        record.successful_auction_reward_coefficient
-      ).multipliedBy(rewardedPersonalContributions);
-
       // 查询下线的人头数及总contributions金额
       const {
+        bondList,
         numberOfInvitees,
         invitationContributions,
       } = await getInvitationData(account, models);
 
-      const successfulAuctionRoyalty = new BigNumber(record.royalty_coefficient)
-        .multipliedBy(record.successful_auction_reward_coefficient)
+      const invitationStraightReward = new BigNumber(
+        record.straight_reward_coefficient
+      )
+        .multipliedBy(record.royalty_coefficient)
         .multipliedBy(invitationContributions);
 
-      // 判断用户是否预约过
-      const ifReserved = await queryIfReserved(account, models);
+      const successfulAuctionRoyalty = new BigNumber(record.royalty_coefficient)
+      .multipliedBy(record.successful_auction_reward_coefficient)
+      .multipliedBy(invitationContributions);
 
       return {
-        ifReserved: ifReserved,
-        personalContributions: personalContributions.toFixed(),
-        rewardedPersonalContributions: rewardedPersonalContributions.toFixed(),
-        successfulAuctionReward: successfulAuctionReward.toFixed(),
-        numberOfInvitees: numberOfInvitees,
         invitationContributions: invitationContributions.toFixed(),
+        numberOfInvitees: numberOfInvitees,
+        bondList: bondList,
+        invitationStraightReward: invitationStraightReward.toFixed(0),
         successfulAuctionRoyalty: successfulAuctionRoyalty.toFixed(),
       };
     },

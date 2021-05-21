@@ -1,9 +1,8 @@
 const { gql } = require("apollo-server");
 
 const Campaign = gql`
-  type Progress {
+  type CampaignInfo {
     targets: String
-    multisigAccountHistoricalBalance: String
     votersNum: Int
   }
 
@@ -23,7 +22,8 @@ const Campaign = gql`
   }
 
   type Query {
-    getCampaignProgress: Progress
+    getCampaignInfo: CampaignInfo
+    getFundingProgress: String
     getTimetable: Timetable
     getCoefficients: CoefficientList
   }
