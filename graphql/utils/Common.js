@@ -158,11 +158,17 @@ export const getInvitationData = async (account, models) => {
   // 邀请人总列表：预约邀请人 + 非预约邀请人
   const inviteeList = reservedInviteeList.concat(unreservedInviteeList);
 
-  const firstVoteObject = await getFirstVoteObject(models, inviteeList);
-  const bondList = Object.keys(firstVoteObject).map((item, idx) => {
+  // 先排序，然后选每个人的最早的投票记录
+  let bondListQueryString = `WHERE "to" = '${MULTISIG_ACCOUNT}' AND "from" IN `;
+  bondListQueryString += getStringQueryList(inviteeList);
+  bondListQueryString += ` ORDER BY "from", "time" ASC`;
+
+  const contributionList = await sequelize.query(`SELECT DISTINCT on ("from") "from", "time" FROM transactions ${bondListQueryString} `, { type: QueryTypes.SELECT });
+
+  const bondList = contributionList.map((item) => {
     return {
-      bondAddress: item,
-      bondTime: Object.values(firstVoteObject)[idx],
+      bondAddress: item.from,
+      bondTime: item.time,
     };
   });
 
@@ -214,8 +220,6 @@ export const getInvitationData = async (account, models) => {
   if (queryString) {
     accountInvitationList = await sequelize.query(`SELECT "from", "amount", "time" FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
   } 
-
-  console.log("accountInvitationList: ", accountInvitationList);
 
   return {
     numberOfInvitees: inviteeList.length,
@@ -310,29 +314,6 @@ export const getRewardedPersonalContributions = async (account, models) => {
   }
 
   return rewardedPersonalContributions.plus(reservationContributions);
-};
-
-// **************************
-// 获取传入账户第一次投票的时间
-export const getFirstVoteObject = async (models, inviteeList) => {
-  const condition = {
-    where: {
-      $and: [{ to: MULTISIG_ACCOUNT }, { from: inviteeList }],
-    },
-    raw: true,
-    order: [["time", "ASC"]], // 按时间升序排列
-  };
-
-  const contributionList = await models.Transactions.findAll(condition);
-
-  let personalFirstVoteObj = {};
-  for (const record of contributionList) {
-    if (!personalFirstVoteObj[record.from]) {
-      personalFirstVoteObj[record.from] = record.time;
-    }
-  }
-
-  return personalFirstVoteObj;
 };
 
 // **************************************
