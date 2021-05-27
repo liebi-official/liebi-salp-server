@@ -157,7 +157,7 @@ const Contributions = {
             return {
               contributorAddress: rawRs["from"],
               amount: rawRs["amount"],
-              timestamp: new Date(rawRs["time"]).toISOString().slice(0, 19),
+              timestamp: rawRs["time"],
               inviterAddress: account,
             };
           }
