@@ -165,7 +165,7 @@ export const getInvitationData = async (account, models) => {
     bondListQueryString += getStringQueryList(inviteeList);
     bondListQueryString += ` ORDER BY "from", "time" ASC`;
 
-    const contributionList = await sequelize.query(`SELECT DISTINCT on ("from") "from", "time" FROM transactions ${bondListQueryString} `, { type: QueryTypes.SELECT });
+    const contributionList = await sequelize.query(`SELECT * FROM (SELECT DISTINCT on ("from") "from", "time" FROM transactions ${bondListQueryString}) first_time_table ORDER BY "time" DESC `, { type: QueryTypes.SELECT });
 
     bondList = contributionList.map((item) => {
       return {
