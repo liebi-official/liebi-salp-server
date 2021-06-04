@@ -20,12 +20,14 @@ const Extended = {
 
       // 计算奖励基础
       let inviteesQueryString = `SELECT inviter_address FROM invitation_codes WHERE "invited_by_address" = '${account}'`;
-      let queryString = `WHERE "paraId" = 2001 AND "accountId" IN (${inviteesQueryString})`;
+      let queryString = `WHERE "para_id" = 2001 AND "account_id" IN (${inviteesQueryString})`;
 
-      const invitationContributions = await sequelize.query(
-        `SELECT SUM(balanceOf::bigint) FROM onchain_contributed ${queryString} `,
+      const result = await sequelize.query(
+        `SELECT SUM(balance_of::bigint) FROM onchain_contributeds ${queryString} `,
         { type: QueryTypes.SELECT }
       );
+
+      const invitationContributions = result[0].sum;
 
       const invitationStraightReward = new BigNumber(
         record.straight_reward_coefficient
