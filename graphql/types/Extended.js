@@ -7,8 +7,16 @@ const Extended = gql`
     successfulAuctionRoyalty: String
   }
 
+  type ExtendedSelfReward {
+    rewardedPersonalContributions: String
+    straightReward: String
+    successfulAuctionReward: String
+    codeExtraInstantReward: String
+  }
+
   type Query {
     getExtendedInvitingReward(account: String!): ExtendedInvitingReward
+    getExtendedSelfReward(account: String!): ExtendedSelfReward
   }
 `;
 
