@@ -41,7 +41,7 @@ const Campaign = {
 
       const record = await models.SalpOverviews.findOne();
 
-      // 获取所有参与投票的人数
+      // 获取所有参与预约的人数
       const condition = {
         distinct: true,
         col: "from",
@@ -49,9 +49,18 @@ const Campaign = {
 
       const votersNum = await models.Transactions.count(condition);
 
+      // 获取所有参与正式投票的人数
+      const condition1 = {
+        distinct: true,
+        col: "account_id",
+      };
+
+      const officialVotersNum = await models.Contributeds.count(condition1);
+
       return {
         targets: record.channel_target,
         votersNum,
+        officialVotersNum,
       };
     },
     getFundingProgress: async (parent, {}, { models }) => {
