@@ -1,6 +1,6 @@
-const onchain_contributeds = (sequelize, DataTypes) => {
-  const OnchainContributeds = sequelize.define(
-    "onchain_contributeds",
+const contributeds = (sequelize, DataTypes) => {
+  const Contributeds = sequelize.define(
+    "contributeds",
     {
       id: {
         type: DataTypes.STRING,
@@ -13,14 +13,14 @@ const onchain_contributeds = (sequelize, DataTypes) => {
       time: {
         type: DataTypes.DATE,
       },
-      accountId: {
+      account_id: {
         type: DataTypes.STRING,
         allowNull: true,
       },
-      paraId: {
+      para_id: {
         type: DataTypes.INTEGER,
       },
-      balanceOf: {
+      balance_of: {
         type: DataTypes.STRING,
       },
     },
@@ -29,7 +29,7 @@ const onchain_contributeds = (sequelize, DataTypes) => {
     }
   );
 
-  return OnchainContributeds;
+  return Contributeds;
 };
 
-export default onchain_contributeds;
+export default contributeds;

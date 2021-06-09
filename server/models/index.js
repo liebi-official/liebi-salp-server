@@ -23,11 +23,8 @@ const models = {
   InvitationCodes: require("./invitation_codes").default(sequelize, Sequelize),
   SalpOverviews: require("./salp_overviews").default(sequelize, Sequelize),
   Coefficients: require("./coefficients").default(sequelize, Sequelize),
-  Memos: require("./memos").default(sequelize, Sequelize),
-  OnchainContributeds: require("./onchain_contributeds").default(
-    sequelize,
-    Sequelize
-  ),
+  Memoupdateds: require("./memoupdateds").default(sequelize, Sequelize),
+  Contributeds: require("./contributeds").default(sequelize, Sequelize),
 };
 
 Object.keys(models).forEach((key) => {

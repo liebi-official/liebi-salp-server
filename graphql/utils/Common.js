@@ -4,7 +4,7 @@ import { sequelize } from "../../server/models";
 import { QueryTypes } from "sequelize";
 dotenv.config();
 
-const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
+const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址列表
 export const KSM_RESERVATION_AMOUNT = 10000000000; // 1^10 = 0.01 KSM
 
 // *************************
@@ -102,7 +102,9 @@ export const campaignInfoInitialization = async (models) => {
 export const getPersonalContributions = async (account, models) => {
   if (!account) return;
 
-  const queryString = `WHERE "from" = '${account}' AND "to" = '${MULTISIG_ACCOUNT}'`;
+  const queryString = `WHERE "from" = '${account}' AND "to" IN ${getStringQueryList(
+    MULTISIG_ACCOUNT
+  )}`;
   const result = await sequelize.query(
     `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
     { type: QueryTypes.SELECT }
@@ -293,9 +295,15 @@ export const authenticateReserveTransaction = async (account, models) => {
 
   // 获取预约开始和结束时间
   const queryString = `WHERE "from" = '${account}' AND \
-                             "to" = '${MULTISIG_ACCOUNT}' AND \
-                             "time" >= to_timestamp(${timeRecord.invitation_start_time}) AND \
-                             "time"  <= to_timestamp(${timeRecord.invitation_end_time})
+                             "to" IN ${getStringQueryList(
+                               MULTISIG_ACCOUNT
+                             )} AND \
+                             "time" >= to_timestamp(${
+                               timeRecord.invitation_start_time
+                             }) AND \
+                             "time"  <= to_timestamp(${
+                               timeRecord.invitation_end_time
+                             })
                              `;
 
   const result = await sequelize.query(
@@ -331,8 +339,12 @@ export const getRewardedPersonalContributions = async (account, models) => {
   }
 
   let queryString = `WHERE "from" = '${account}' AND \
-                              "to" = '${MULTISIG_ACCOUNT}' AND \
-                              "time"  <= to_timestamp(${timeRecord.salp_end_time}) AND 
+                              "to" IN ${getStringQueryList(
+                                MULTISIG_ACCOUNT
+                              )} AND \
+                              "time"  <= to_timestamp(${
+                                timeRecord.salp_end_time
+                              }) AND 
                               `;
 
   // 判断该账户是否已预约，根据预约的情况，从不同的时间开始计算参与奖励的contributions
@@ -387,11 +399,14 @@ export const calculateExtendedInvitingReward = async (account, models) => {
   let queryString = `WHERE "para_id" = 2001 AND "account_id" IN (${inviteesQueryString})`;
 
   const result = await sequelize.query(
-    `SELECT SUM(balance_of::bigint) FROM onchain_contributeds ${queryString} `,
+    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
     { type: QueryTypes.SELECT }
   );
 
-  const invitationContributions = result[0].sum;
+  let invitationContributions = new BigNumber(0);
+  if (result[0].sum) {
+    const invitationContributions = result[0].sum;
+  }
 
   const invitationStraightReward = new BigNumber(
     record.straight_reward_coefficient
@@ -422,7 +437,7 @@ export const calculateExtendedSelfReward = async (account, models) => {
   // 计算在官网投票的personalContributions
   const queryString = `WHERE "para_id" = 2001 AND "account_id" = '${account}'`;
   const result = await sequelize.query(
-    `SELECT SUM(balance_of::bigint) FROM onchain_contributeds ${queryString} `,
+    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
     { type: QueryTypes.SELECT }
   );
 

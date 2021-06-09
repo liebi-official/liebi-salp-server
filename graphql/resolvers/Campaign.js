@@ -1,21 +1,25 @@
 import {
   campaignInfoInitialization,
+  getStringQueryList,
 } from "../utils/Common";
 import dotenv from "dotenv";
 import BigNumber from "bignumber.js";
 import { sequelize } from "../../server/models";
-import { QueryTypes } from 'sequelize';
+import { QueryTypes } from "sequelize";
 dotenv.config();
 
-const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
+const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址
 
 const getMultisigAccountHistoricalBalance = async (models) => {
   // 只要是转账到多签账户的交易都计算入内
-  const queryString = `WHERE "to" = '${MULTISIG_ACCOUNT}'`;
-  const result = await sequelize.query(`SELECT SUM(amount::bigint) FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
+  const queryString = `WHERE "to" IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
+  const result = await sequelize.query(
+    `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
+    { type: QueryTypes.SELECT }
+  );
 
   let multisigAccountHistoricalBalance = new BigNumber(0);
-  if (result[0].sum){
+  if (result[0].sum) {
     multisigAccountHistoricalBalance = new BigNumber(result[0].sum);
   }
 
@@ -40,14 +44,14 @@ const Campaign = {
       // 获取所有参与投票的人数
       const condition = {
         distinct: true,
-        col: "from"
+        col: "from",
       };
 
       const votersNum = await models.Transactions.count(condition);
 
       return {
         targets: record.channel_target,
-        votersNum
+        votersNum,
       };
     },
     getFundingProgress: async (parent, {}, { models }) => {
