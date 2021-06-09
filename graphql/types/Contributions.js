@@ -1,7 +1,6 @@
 const { gql } = require("apollo-server");
 
 const Contributions = gql`
-
   type InviteeInfo {
     bondAddress: String
     bondTime: String

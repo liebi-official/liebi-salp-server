@@ -2,12 +2,11 @@ import BigNumber from "bignumber.js";
 import {
   getRandomCombination,
   campaignInfoInitialization,
-  getPersonalContributions,
   getInvitationData,
   queryIfReserved,
-  KSM_RESERVATION_AMOUNT,
-  getRewardedPersonalContributions,
   authenticateReserveTransaction,
+  calculateSelfReward,
+  calculateInvitingReward,
 } from "../utils/Common";
 
 // GraphQL查询的resolver
@@ -17,87 +16,26 @@ const Contributions = {
   // ===========================================================================
   Query: {
     getSelfReward: async (parent, { account }, { models }) => {
-      // 确保Coefficients表有值
-      let recordNum = await models.Coefficients.count();
-      if (recordNum == 0) {
-        await campaignInfoInitialization(models);
-      }
-
-      let record = await models.Coefficients.findOne();
-
-      // 查询个人的contribution，可用于展示vsKSM有多少
-      const personalContributions = await getPersonalContributions(account, models);
-
-      // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
-      const rewardedPersonalContributions = await getRewardedPersonalContributions(
-        account,
-        models
-      );
-
-      const straightReward = new BigNumber(
-        record.straight_reward_coefficient
-      ).multipliedBy(rewardedPersonalContributions);
-
-      const successfulAuctionReward = new BigNumber(
-        record.successful_auction_reward_coefficient
-      ).multipliedBy(rewardedPersonalContributions);
-
-      // 如果该用户绑定了邀请人，则可获得额外的10%奖励
-      let codeExtraInstantReward = new BigNumber(0);
-
-      // 看是否在表里，在表里就是绑定过邀请码的
-      const condition = {
-        where: { inviter_address: account },
-        raw: true, // 获取object array
-      };
-
-      const recordCount = await models.InvitationCodes.count(condition);
-
-      if (recordCount != 0) {
-        // 也是获得应得即时奖励金额的10%，与邀请人获得的邀请奖励是一样的
-        codeExtraInstantReward = straightReward.multipliedBy(record.royalty_coefficient);
-      }
-
+      const result = await calculateSelfReward(account, models);
       return {
-        personalContributions: personalContributions.toFixed(0),
-        rewardedPersonalContributions: rewardedPersonalContributions.toFixed(0),
-        straightReward: straightReward.toFixed(0),
-        codeExtraInstantReward: codeExtraInstantReward.toFixed(0),
-        successfulAuctionReward: successfulAuctionReward.toFixed(),
+        personalContributions: result.personalContributions.toFixed(0),
+        rewardedPersonalContributions: result.rewardedPersonalContributions.toFixed(
+          0
+        ),
+        straightReward: result.straightReward.toFixed(0),
+        codeExtraInstantReward: result.codeExtraInstantReward.toFixed(0),
+        successfulAuctionReward: result.successfulAuctionReward.toFixed(),
       };
     },
     getInvitingReward: async (parent, { account }, { models }) => {
-      // 确保Coefficients表有值
-      let recordNum = await models.Coefficients.count();
-      if (recordNum == 0) {
-        await campaignInfoInitialization(models);
-      }
-
-      let record = await models.Coefficients.findOne();
-
-      // 查询下线的人头数及总contributions金额
-      const {
-        bondList,
-        numberOfInvitees,
-        invitationContributions,
-      } = await getInvitationData(account, models);
-
-      const invitationStraightReward = new BigNumber(
-        record.straight_reward_coefficient
-      )
-        .multipliedBy(record.royalty_coefficient)
-        .multipliedBy(invitationContributions);
-
-      const successfulAuctionRoyalty = new BigNumber(record.royalty_coefficient)
-      .multipliedBy(record.successful_auction_reward_coefficient)
-      .multipliedBy(invitationContributions);
+      const result = await calculateInvitingReward(account, models);
 
       return {
-        invitationContributions: invitationContributions.toFixed(),
-        numberOfInvitees: numberOfInvitees,
-        bondList: bondList,
-        invitationStraightReward: invitationStraightReward.toFixed(0),
-        successfulAuctionRoyalty: successfulAuctionRoyalty.toFixed(),
+        invitationContributions: result.invitationContributions.toFixed(),
+        numberOfInvitees: result.numberOfInvitees,
+        bondList: result.bondList,
+        invitationStraightReward: result.invitationStraightReward.toFixed(0),
+        successfulAuctionRoyalty: result.successfulAuctionRoyalty.toFixed(),
       };
     },
     getInvitationCodeByAccount: async (parent, { account }, { models }) => {

@@ -1,10 +1,10 @@
 import BigNumber from "bignumber.js";
 import dotenv from "dotenv";
 import { sequelize } from "../../server/models";
-import { QueryTypes } from 'sequelize';
+import { QueryTypes } from "sequelize";
 dotenv.config();
 
-const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT; // 多签账户地址
+const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址列表
 export const KSM_RESERVATION_AMOUNT = 10000000000; // 1^10 = 0.01 KSM
 
 // *************************
@@ -102,12 +102,17 @@ export const campaignInfoInitialization = async (models) => {
 export const getPersonalContributions = async (account, models) => {
   if (!account) return;
 
-  const queryString = `WHERE "from" = '${account}' AND "to" = '${MULTISIG_ACCOUNT}'`;
-  const result = await sequelize.query(`SELECT SUM(amount::bigint) FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
+  const queryString = `WHERE "from" = '${account}' AND "to" IN ${getStringQueryList(
+    MULTISIG_ACCOUNT
+  )}`;
+  const result = await sequelize.query(
+    `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
+    { type: QueryTypes.SELECT }
+  );
 
   let personalContributions = new BigNumber(0);
   if (result[0].sum) {
-    personalContributions = new BigNumber(result[0].sum)
+    personalContributions = new BigNumber(result[0].sum);
   }
 
   return personalContributions;
@@ -130,13 +135,17 @@ export const getInvitationData = async (account, models) => {
     raw: true, // 获取object array
   };
 
-  let reservedInviteeList = await models.InvitationCodes.findAll(reservedCondition);
+  let reservedInviteeList = await models.InvitationCodes.findAll(
+    reservedCondition
+  );
   reservedInviteeList = reservedInviteeList.map((item) => {
     return item["inviter_address"];
   });
 
   const reservedInvitees = reservedInviteeList.length;
-  const reserveContributions = new BigNumber(reservedInvitees).multipliedBy(KSM_RESERVATION_AMOUNT);
+  const reserveContributions = new BigNumber(reservedInvitees).multipliedBy(
+    KSM_RESERVATION_AMOUNT
+  );
 
   //第二批，没预约过的被邀请人
   let unreservedCondition = {
@@ -159,22 +168,38 @@ export const getInvitationData = async (account, models) => {
   const inviteeList = reservedInviteeList.concat(unreservedInviteeList);
 
   let bondList = [];
-    if (inviteeList.length != 0) {
+  if (inviteeList.length != 0) {
     // 先排序，然后选每个人的最早的投票记录
     let bondListQueryString = `WHERE "to" = '${MULTISIG_ACCOUNT}' AND "from" IN `;
     bondListQueryString += getStringQueryList(inviteeList);
     bondListQueryString += ` ORDER BY "from", "time" ASC`;
 
-    const contributionList = await sequelize.query(`SELECT * FROM (SELECT DISTINCT on ("from") "from", "time" FROM transactions ${bondListQueryString}) first_time_table ORDER BY "time" DESC `, { type: QueryTypes.SELECT });
+    const contributionList = await sequelize.query(
+      `SELECT * FROM (SELECT DISTINCT on ("from") "from", "time" FROM transactions ${bondListQueryString}) first_time_table ORDER BY "time" DESC `,
+      { type: QueryTypes.SELECT }
+    );
 
-    bondList = contributionList.map((item) => {
+    const invitationList = await sequelize.query(
+      `SELECT inviter_address "from", created_at "time" FROM invitation_codes`,
+      { type: QueryTypes.SELECT }
+    );
+
+    const comprehensiveList = contributionList.concat(invitationList);
+
+    // 去重
+    let obj = {};
+    let allList = comprehensiveList.reduce((all, next) => {
+      obj[next.from] ? "" : (obj[next.from] = true && all.push(next));
+      return all;
+    }, []);
+
+    bondList = allList.map((item) => {
       return {
         bondAddress: item.from,
         bondTime: item.time,
       };
     });
   }
-
 
   // 计算下线在正式投票阶段的贡献额
   // 已预约的贡献额
@@ -203,18 +228,21 @@ export const getInvitationData = async (account, models) => {
 
   if (reservedQueryString && unreservedQueryString) {
     queryString = `WHERE (${reservedQueryString}) OR (${unreservedQueryString})`;
-  } else if(reservedQueryString){
+  } else if (reservedQueryString) {
     queryString = `WHERE ${reservedQueryString}`;
-  } else if(unreservedQueryString) {
+  } else if (unreservedQueryString) {
     queryString = `WHERE ${unreservedQueryString}`;
   }
-  
+
   if (queryString) {
-    const result = await sequelize.query(`SELECT SUM(amount::bigint) FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
+    const result = await sequelize.query(
+      `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
+      { type: QueryTypes.SELECT }
+    );
     if (result[0].sum) {
-      invitationContributions = new BigNumber(result[0].sum)
+      invitationContributions = new BigNumber(result[0].sum);
     }
-  } 
+  }
 
   // 投票阶段的投票金额+预约每个人头算0.01个KSM = 总可计算金额
   invitationContributions = invitationContributions.plus(reserveContributions);
@@ -222,14 +250,17 @@ export const getInvitationData = async (account, models) => {
   // 查出accountInvitationList，即符合时间条件的下线的交易列表
   let accountInvitationList = [];
   if (queryString) {
-    accountInvitationList = await sequelize.query(`SELECT "from", "amount", "time" FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
-  } 
+    accountInvitationList = await sequelize.query(
+      `SELECT "from", "amount", "time" FROM transactions ${queryString} `,
+      { type: QueryTypes.SELECT }
+    );
+  }
 
   return {
     numberOfInvitees: inviteeList.length,
     invitationContributions,
     bondList: bondList,
-    accountInvitationList
+    accountInvitationList,
   };
 };
 
@@ -264,12 +295,21 @@ export const authenticateReserveTransaction = async (account, models) => {
 
   // 获取预约开始和结束时间
   const queryString = `WHERE "from" = '${account}' AND \
-                             "to" = '${MULTISIG_ACCOUNT}' AND \
-                             "time" >= to_timestamp(${timeRecord.invitation_start_time}) AND \
-                             "time"  <= to_timestamp(${timeRecord.invitation_end_time})
+                             "to" IN ${getStringQueryList(
+                               MULTISIG_ACCOUNT
+                             )} AND \
+                             "time" >= to_timestamp(${
+                               timeRecord.invitation_start_time
+                             }) AND \
+                             "time"  <= to_timestamp(${
+                               timeRecord.invitation_end_time
+                             })
                              `;
-                             
-  const result = await sequelize.query(`SELECT SUM(amount::bigint) FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
+
+  const result = await sequelize.query(
+    `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
+    { type: QueryTypes.SELECT }
+  );
 
   if (!result[0].sum || result[0].sum == "0") {
     return false;
@@ -299,10 +339,14 @@ export const getRewardedPersonalContributions = async (account, models) => {
   }
 
   let queryString = `WHERE "from" = '${account}' AND \
-                              "to" = '${MULTISIG_ACCOUNT}' AND \
-                              "time"  <= to_timestamp(${timeRecord.salp_end_time}) AND 
+                              "to" IN ${getStringQueryList(
+                                MULTISIG_ACCOUNT
+                              )} AND \
+                              "time"  <= to_timestamp(${
+                                timeRecord.salp_end_time
+                              }) AND 
                               `;
-  
+
   // 判断该账户是否已预约，根据预约的情况，从不同的时间开始计算参与奖励的contributions
   if (ifReserved) {
     queryString += `"time" >= to_timestamp(${timeRecord.salp_whitelist_start_time})`;
@@ -310,11 +354,14 @@ export const getRewardedPersonalContributions = async (account, models) => {
     queryString += `"time" >= to_timestamp(${timeRecord.salp_start_time})`;
   }
 
-  const result = await sequelize.query(`SELECT SUM(amount::bigint) FROM transactions ${queryString} `, { type: QueryTypes.SELECT });
+  const result = await sequelize.query(
+    `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
+    { type: QueryTypes.SELECT }
+  );
 
   let rewardedPersonalContributions = new BigNumber(0);
   if (result[0].sum) {
-    rewardedPersonalContributions = new BigNumber(result[0].sum)
+    rewardedPersonalContributions = new BigNumber(result[0].sum);
   }
 
   return rewardedPersonalContributions.plus(reservationContributions);
@@ -329,10 +376,195 @@ export const getStringQueryList = (stringList) => {
 
   let queryString = "(";
   let i;
-  for (i = 0; i < stringList.length-1; i++) {
-    queryString += `'${stringList[i]}',`
-  };
-  queryString += `'${stringList[i]}')`
+  for (i = 0; i < stringList.length - 1; i++) {
+    queryString += `'${stringList[i]}',`;
+  }
+  queryString += `'${stringList[i]}')`;
 
   return queryString;
+};
+
+// **************************************
+// 下面是为了SALP励两条渠道相加而封装的代码
+export const calculateExtendedInvitingReward = async (account, models) => {
+  // 确保Coefficients表有值
+  let recordNum = await models.Coefficients.count();
+  if (recordNum == 0) {
+    await campaignInfoInitialization(models);
+  }
+  let record = await models.Coefficients.findOne();
+
+  // 计算奖励基础
+  let inviteesQueryString = `SELECT inviter_address FROM invitation_codes WHERE "invited_by_address" = '${account}'`;
+  let queryString = `WHERE "para_id" = 2001 AND "account_id" IN (${inviteesQueryString})`;
+
+  const result = await sequelize.query(
+    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
+    { type: QueryTypes.SELECT }
+  );
+
+  let invitationContributions = new BigNumber(0);
+  if (result[0].sum) {
+    const invitationContributions = result[0].sum;
+  }
+
+  const invitationStraightReward = new BigNumber(
+    record.straight_reward_coefficient
+  )
+    .multipliedBy(record.royalty_coefficient)
+    .multipliedBy(invitationContributions);
+
+  const successfulAuctionRoyalty = new BigNumber(record.royalty_coefficient)
+    .multipliedBy(record.successful_auction_reward_coefficient)
+    .multipliedBy(invitationContributions);
+
+  return {
+    invitationContributions,
+    invitationStraightReward,
+    successfulAuctionRoyalty,
+  };
+};
+
+export const calculateExtendedSelfReward = async (account, models) => {
+  // 确保Coefficients表有值
+  let recordNum = await models.Coefficients.count();
+  if (recordNum == 0) {
+    await campaignInfoInitialization(models);
+  }
+
+  let record = await models.Coefficients.findOne();
+
+  // 计算在官网投票的personalContributions
+  const queryString = `WHERE "para_id" = 2001 AND "account_id" = '${account}'`;
+  const result = await sequelize.query(
+    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
+    { type: QueryTypes.SELECT }
+  );
+
+  let rewardedPersonalContributions = new BigNumber(0);
+  if (result[0].sum) {
+    rewardedPersonalContributions = new BigNumber(result[0].sum);
+  }
+
+  // 计算各种奖励
+  const straightReward = new BigNumber(
+    record.straight_reward_coefficient
+  ).multipliedBy(rewardedPersonalContributions);
+
+  const successfulAuctionReward = new BigNumber(
+    record.successful_auction_reward_coefficient
+  ).multipliedBy(rewardedPersonalContributions);
+
+  // 如果该用户绑定了邀请人，则可获得额外的10%奖励
+  let codeExtraInstantReward = new BigNumber(0);
+
+  // 看是否在表里，在表里就是绑定过邀请码的
+  const condition = {
+    where: { inviter_address: account },
+    raw: true, // 获取object array
+  };
+
+  const recordCount = await models.InvitationCodes.count(condition);
+
+  if (recordCount != 0) {
+    // 也是获得应得即时奖励金额的10%，与邀请人获得的邀请奖励是一样的
+    codeExtraInstantReward = straightReward.multipliedBy(
+      record.royalty_coefficient
+    );
+  }
+
+  return {
+    rewardedPersonalContributions,
+    straightReward,
+    codeExtraInstantReward,
+    successfulAuctionReward,
+  };
+};
+
+export const calculateSelfReward = async (account, models) => {
+  // 确保Coefficients表有值
+  let recordNum = await models.Coefficients.count();
+  if (recordNum == 0) {
+    await campaignInfoInitialization(models);
+  }
+
+  let record = await models.Coefficients.findOne();
+
+  // 查询个人的contribution，可用于展示vsKSM有多少
+  const personalContributions = await getPersonalContributions(account, models);
+
+  // 查询个人的符合奖励条件contribution，并计算相应的竞拍成功奖励
+  const rewardedPersonalContributions = await getRewardedPersonalContributions(
+    account,
+    models
+  );
+
+  const straightReward = new BigNumber(
+    record.straight_reward_coefficient
+  ).multipliedBy(rewardedPersonalContributions);
+
+  const successfulAuctionReward = new BigNumber(
+    record.successful_auction_reward_coefficient
+  ).multipliedBy(rewardedPersonalContributions);
+
+  // 如果该用户绑定了邀请人，则可获得额外的10%奖励
+  let codeExtraInstantReward = new BigNumber(0);
+
+  // 看是否在表里，在表里就是绑定过邀请码的
+  const condition = {
+    where: { inviter_address: account },
+    raw: true, // 获取object array
+  };
+
+  const recordCount = await models.InvitationCodes.count(condition);
+
+  if (recordCount != 0) {
+    // 也是获得应得即时奖励金额的10%，与邀请人获得的邀请奖励是一样的
+    codeExtraInstantReward = straightReward.multipliedBy(
+      record.royalty_coefficient
+    );
+  }
+
+  return {
+    personalContributions,
+    rewardedPersonalContributions,
+    straightReward,
+    codeExtraInstantReward,
+    successfulAuctionReward,
+  };
+};
+
+export const calculateInvitingReward = async (account, models) => {
+  // 确保Coefficients表有值
+  let recordNum = await models.Coefficients.count();
+  if (recordNum == 0) {
+    await campaignInfoInitialization(models);
+  }
+
+  let record = await models.Coefficients.findOne();
+
+  // 查询下线的人头数及总contributions金额
+  const {
+    bondList,
+    numberOfInvitees,
+    invitationContributions,
+  } = await getInvitationData(account, models);
+
+  const invitationStraightReward = new BigNumber(
+    record.straight_reward_coefficient
+  )
+    .multipliedBy(record.royalty_coefficient)
+    .multipliedBy(invitationContributions);
+
+  const successfulAuctionRoyalty = new BigNumber(record.royalty_coefficient)
+    .multipliedBy(record.successful_auction_reward_coefficient)
+    .multipliedBy(invitationContributions);
+
+  return {
+    invitationContributions,
+    numberOfInvitees: numberOfInvitees,
+    bondList: bondList,
+    invitationStraightReward,
+    successfulAuctionRoyalty,
+  };
 };

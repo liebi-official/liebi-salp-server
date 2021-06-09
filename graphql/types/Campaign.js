@@ -4,6 +4,7 @@ const Campaign = gql`
   type CampaignInfo {
     targets: String
     votersNum: Int
+    officialVotersNum: Int
   }
 
   type Timetable {
