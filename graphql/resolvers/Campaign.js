@@ -53,6 +53,7 @@ const Campaign = {
       const condition1 = {
         distinct: true,
         col: "account_id",
+        where: { para_id: "2001" },
       };
 
       const officialVotersNum = await models.Contributeds.count(condition1);

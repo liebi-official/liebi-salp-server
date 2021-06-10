@@ -18,7 +18,7 @@ const memoupdateds = (sequelize, DataTypes) => {
         allowNull: true,
       },
       para_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.STRING,
       },
       memo: {
         type: DataTypes.STRING,
