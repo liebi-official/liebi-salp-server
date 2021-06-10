@@ -398,7 +398,7 @@ export const calculateExtendedInvitingReward = async (account, models) => {
 
   // 计算奖励基础
   let inviteesQueryString = `SELECT inviter_address FROM invitation_codes WHERE "invited_by_address" = '${account}'`;
-  let queryString = `WHERE "para_id" = "2001" AND "account_id" IN (${inviteesQueryString})`;
+  let queryString = `WHERE "para_id" = '2001' AND "account_id" IN (${inviteesQueryString})`;
 
   const result = await sequelize.query(
     `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
@@ -437,7 +437,7 @@ export const calculateExtendedSelfReward = async (account, models) => {
   let record = await models.Coefficients.findOne();
 
   // 计算在官网投票的personalContributions
-  const queryString = `WHERE "para_id" = "2001" AND "account_id" = '${account}'`;
+  const queryString = `WHERE "para_id" = '2001' AND "account_id" = '${account}'`;
   const result = await sequelize.query(
     `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
     { type: QueryTypes.SELECT }
