@@ -170,7 +170,9 @@ export const getInvitationData = async (account, models) => {
   let bondList = [];
   if (inviteeList.length != 0) {
     // 先排序，然后选每个人的最早的投票记录
-    let bondListQueryString = `WHERE "to" = '${MULTISIG_ACCOUNT}' AND "from" IN `;
+    let bondListQueryString = `WHERE "to" IN ${getStringQueryList(
+      MULTISIG_ACCOUNT
+    )} AND "from" IN `;
     bondListQueryString += getStringQueryList(inviteeList);
     bondListQueryString += ` ORDER BY "from", "time" ASC`;
 

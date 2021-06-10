@@ -45,18 +45,30 @@ const Campaign = {
       const condition = {
         distinct: true,
         col: "from",
+        where: { to: MULTISIG_ACCOUNT[0] },
       };
 
       const votersNum = await models.Transactions.count(condition);
 
-      // 获取所有参与正式投票的人数
+      // 获取所有在官方渠道参与正式投票的人数
       const condition1 = {
         distinct: true,
         col: "account_id",
         where: { para_id: "2001" },
       };
 
-      const officialVotersNum = await models.Contributeds.count(condition1);
+      const officialVotersNum1 = await models.Contributeds.count(condition1);
+
+      // 获取所有在bifrost渠道参与竞拍的人数
+      const condition2 = {
+        distinct: true,
+        col: "from",
+        where: { to: MULTISIG_ACCOUNT[1] },
+      };
+
+      const officialVotersNum2 = await models.Transactions.count(condition2);
+
+      const officialVotersNum = officialVotersNum1 + officialVotersNum2;
 
       return {
         targets: record.channel_target,
