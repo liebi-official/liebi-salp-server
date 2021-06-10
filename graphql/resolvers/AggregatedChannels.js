@@ -23,13 +23,6 @@ const AggregatedChannels = {
         models
       );
 
-      console.log(
-        "*******multisigInvitingReward.invitationContributions: ",
-        multisigInvitingReward.invitationContributions.plus(
-          extendedInvitingReward.invitationContributions
-        )
-      );
-
       return {
         invitationContributions: multisigInvitingReward.invitationContributions
           .plus(extendedInvitingReward.invitationContributions)

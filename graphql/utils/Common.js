@@ -182,7 +182,7 @@ export const getInvitationData = async (account, models) => {
     );
 
     const invitationList = await sequelize.query(
-      `SELECT inviter_address "from", created_at "time" FROM invitation_codes`,
+      `SELECT inviter_address "from", created_at "time" FROM invitation_codes WHERE "invited_by_address" = 'account'`,
       { type: QueryTypes.SELECT }
     );
 
