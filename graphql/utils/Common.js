@@ -501,9 +501,17 @@ export const calculateSelfReward = async (account, models) => {
     models
   );
 
-  const straightReward = new BigNumber(
+  let straightReward = new BigNumber(
     record.straight_reward_coefficient
   ).multipliedBy(rewardedPersonalContributions);
+
+  // 如果用户是已预约成功的用户，则可获得额外的 50000/43720=1143641354071 个BNC
+  const airdropCondition = { where: { inviter_address: account } };
+  const rs = await models.InvitationCodes.findOne(airdropCondition);
+
+  if (rs && rs.if_authenticated == true) {
+    straightReward = straightReward.plus(new BigNumber(1143641354071));
+  }
 
   const successfulAuctionReward = new BigNumber(
     record.successful_auction_reward_coefficient
