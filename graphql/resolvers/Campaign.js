@@ -12,8 +12,8 @@ const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账�
 
 const getMultisigAccountHistoricalBalance = async (models) => {
   // 只要是转账到多签账户的交易都计算入内
-  const queryString = `WHERE "to" IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
-  const result = await sequelize.query(
+  let queryString = `WHERE "to" IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
+  let result = await sequelize.query(
     `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
     { type: QueryTypes.SELECT }
   );
@@ -21,6 +21,22 @@ const getMultisigAccountHistoricalBalance = async (models) => {
   let multisigAccountHistoricalBalance = new BigNumber(0);
   if (result[0].sum) {
     multisigAccountHistoricalBalance = new BigNumber(result[0].sum);
+  }
+
+  // 还需要添加官方crowdloan投票的金额。不含两个多签账户，不然就重复计算了
+  queryString = `WHERE "para_id" = '2001' AND "account_id" NOT IN ${getStringQueryList(
+    MULTISIG_ACCOUNT
+  )}`;
+
+  result = await sequelize.query(
+    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
+    { type: QueryTypes.SELECT }
+  );
+
+  if (result[0].sum) {
+    multisigAccountHistoricalBalance = new BigNumber(result[0].sum).plus(
+      multisigAccountHistoricalBalance
+    );
   }
 
   return multisigAccountHistoricalBalance;
