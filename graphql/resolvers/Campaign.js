@@ -12,7 +12,9 @@ const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账�
 
 const getMultisigAccountHistoricalBalance = async (models) => {
   // 只要是转账到多签账户的交易都计算入内
-  let queryString = `WHERE "to" IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
+  let queryString = `WHERE "to" IN ${getStringQueryList(
+    MULTISIG_ACCOUNT
+  )} AND "from" NOT IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
   let result = await sequelize.query(
     `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
     { type: QueryTypes.SELECT }
