@@ -264,7 +264,7 @@ const Contributions = {
 
       // 判断邀请人的邀请码是否有效。无效则返回邀请人无效
       let inviteRecord = await models.InvitationCodes.findOne({
-        where: { inviter_code: invited_by_code },
+        where: { inviter_code: invited_by_code.toUpperCase() },
       });
 
       if (!inviteRecord) {
