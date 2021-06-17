@@ -22,9 +22,15 @@ const Campaign = gql`
     royaltyCoefficient: Float
   }
 
+  type FundingChannels {
+    totalProgress: String
+    crowdloan: String
+    liquidity: String
+  }
+
   type Query {
     getCampaignInfo: CampaignInfo
-    getFundingProgress: String
+    getFundingProgress: FundingChannels
     getTimetable: Timetable
     getCoefficients: CoefficientList
   }

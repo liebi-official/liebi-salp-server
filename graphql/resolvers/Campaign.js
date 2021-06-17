@@ -9,6 +9,7 @@ import { QueryTypes } from "sequelize";
 dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址
+const LIQUIDITY_RATE = 0.05;
 
 const getMultisigAccountHistoricalBalance = async (models) => {
   // 只要是转账到多签账户的交易都计算入内
@@ -24,6 +25,9 @@ const getMultisigAccountHistoricalBalance = async (models) => {
   if (result[0].sum) {
     multisigAccountHistoricalBalance = new BigNumber(result[0].sum);
   }
+
+  const multisigVotes = new BigNumber(result[0].sum);
+  const liquidity = multisigVotes.multipliedBy(LIQUIDITY_RATE);
 
   // 还需要添加官方crowdloan投票的金额。不含两个多签账户，不然就重复计算了
   queryString = `WHERE "para_id" = '2001' AND "account_id" NOT IN ${getStringQueryList(
@@ -41,7 +45,16 @@ const getMultisigAccountHistoricalBalance = async (models) => {
     );
   }
 
-  return multisigAccountHistoricalBalance;
+  // 总投票金额应为，crowdloan金额+投到多签账户的钱-5%多签账户的流动性
+  const crowdloan = new BigNumber(result[0].sum)
+    .plus(multisigVotes)
+    .minus(liquidity);
+
+  return {
+    totalProgress: multisigAccountHistoricalBalance,
+    crowdloan,
+    liquidity,
+  };
 };
 
 // GraphQL查询的resolver
@@ -96,11 +109,13 @@ const Campaign = {
     },
     getFundingProgress: async (parent, {}, { models }) => {
       // 获取多签账户历史记录余额
-      const multisig_account_historical_balance = await getMultisigAccountHistoricalBalance(
-        models
-      );
+      const result = await getMultisigAccountHistoricalBalance(models);
 
-      return multisig_account_historical_balance.toFixed();
+      return {
+        totalProgress: result.totalProgress.toFixed(0),
+        crowdloan: result.crowdloan.toFixed(0),
+        liquidity: result.liquidity.toFixed(0),
+      };
     },
     getTimetable: async (parent, {}, { models }) => {
       // 查询如果没有数据，则读取.env文件，初始化salp_overview表格
