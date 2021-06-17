@@ -28,11 +28,21 @@ const Campaign = gql`
     liquidity: String
   }
 
+  type ContributionRecord {
+    address: String
+    amount: String
+    time: String
+  }
+
   type Query {
     getCampaignInfo: CampaignInfo
     getFundingProgress: FundingChannels
     getTimetable: Timetable
     getCoefficients: CoefficientList
+    getAllContributionRecord(
+      offset: Int! # offset指的是第几页，从第1页开始
+      recordNum: Int = 5 # 指的是每页几条记录，默认值为5
+    ): [ContributionRecord]
   }
 `;
 

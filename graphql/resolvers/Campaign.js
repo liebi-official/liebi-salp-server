@@ -152,6 +152,35 @@ const Campaign = {
         royaltyCoefficient: record.royalty_coefficient,
       };
     },
+    getAllContributionRecord: async (
+      parent,
+      { offset, recordNum },
+      { models }
+    ) => {
+      const queryString = `WHERE "to" IN ${getStringQueryList(
+        MULTISIG_ACCOUNT
+      )} AND "from" NOT IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
+
+      const queryString2 = `WHERE "para_id" = '2001' AND "account_id" NOT IN ${getStringQueryList(
+        MULTISIG_ACCOUNT
+      )}`;
+
+      const result = await sequelize.query(
+        `
+        SELECT "account_id" "address", balance_of::text "amount", "time" FROM contributeds  ${queryString2} 
+        UNION 
+        SELECT "from" "address", amount::text, "time" FROM transactions ${queryString}
+        ORDER BY "time" DESC 
+        LIMIT ${recordNum}
+        OFFSET ${(offset - 1) * recordNum}
+          `,
+        { type: QueryTypes.SELECT }
+      );
+
+      console.log("result: ", result);
+
+      return result;
+    },
   },
 };
 
