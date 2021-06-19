@@ -34,6 +34,11 @@ const Campaign = gql`
     time: String
   }
 
+  type accumulatedData {
+    time: String
+    accumulated: String
+  }
+
   type Query {
     getCampaignInfo: CampaignInfo
     getFundingProgress: FundingChannels
@@ -43,6 +48,7 @@ const Campaign = gql`
       offset: Int! # offset指的是第几页，从第1页开始
       recordNum: Int = 5 # 指的是每页几条记录，默认值为5
     ): [ContributionRecord]
+    getAccumulatedContributionsSeries: [accumulatedData]
   }
 `;
 
