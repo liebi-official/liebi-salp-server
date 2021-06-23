@@ -180,24 +180,12 @@ const Campaign = {
       return result;
     },
     getAccumulatedContributionsSeries: async (parent, {}, { models }) => {
-      const queryString = `WHERE "to" IN ${getStringQueryList(
-        MULTISIG_ACCOUNT
-      )} AND "from" NOT IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
+      const dataString = `SELECT date_trunc('hour', time) as "time", balance_of::bigint "amount" 
+                          FROM contributeds 
+                          WHERE "para_id" = '2001'
+                          ORDER BY "time" ASC `;
 
-      const queryString2 = `WHERE "para_id" = '2001' AND "account_id" NOT IN ${getStringQueryList(
-        MULTISIG_ACCOUNT
-      )}`;
-
-      const recordQueryString = `
-      SELECT balance_of::bigint "amount", "time" FROM contributeds  ${queryString2} 
-      UNION 
-      SELECT amount::bigint, "time" FROM transactions ${queryString}
-      ORDER BY "time" DESC `
-
-      const dataString = `SELECT date_trunc('hour', time) as "time", amount::bigint 
-      FROM (${recordQueryString}) union_table`;
-
-      const seriesString = `SELECT * FROM generate_series('2021-05-14 00:00'::timestamp,
+      const seriesString = `SELECT * FROM generate_series('2021-06-14 00:00'::timestamp,
       now(), '1 hours') as time`;
 
       const mainString = `SELECT time_table.time "time", SUM(data_table.amount::bigint) accumulated 
