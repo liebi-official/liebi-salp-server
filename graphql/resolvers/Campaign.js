@@ -185,7 +185,7 @@ const Campaign = {
                           WHERE "para_id" = '2001'
                           ORDER BY "time" ASC `;
 
-      const seriesString = `SELECT * FROM generate_series('2021-06-14 00:00'::timestamp,
+      const seriesString = `SELECT * FROM generate_series('2021-06-14 14:00'::timestamp,
       now(), '1 hours') as time`;
 
       const mainString = `SELECT time_table.time "time", SUM(data_table.amount::bigint) accumulated 
