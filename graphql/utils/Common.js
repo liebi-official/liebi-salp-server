@@ -127,45 +127,16 @@ export const getInvitationData = async (account, models) => {
   // 分两批计算，第一批为预约过的被邀请人，第二批为未预约过的被邀请人。原因是两者的开始计算投票金额时间不一样，而且算预约奖励人头也不一样
 
   //第一批，已经预约过的被邀请人
-  let reservedCondition = {
-    where: {
-      $and: [{ invited_by_address: account }, { if_authenticated: true }], // 被邀请的账户，无论被邀请账户是否预约过，他的投票都算进去别人的邀请金额里面
-    },
+  let condition = {
+    where: {invited_by_address: account}, // 被邀请的账户，无论被邀请账户是否预约过，他的投票都算进去别人的邀请金额里面
     attributes: ["inviter_address"],
     raw: true, // 获取object array
   };
 
-  let reservedInviteeList = await models.InvitationCodes.findAll(
-    reservedCondition
-  );
-  reservedInviteeList = reservedInviteeList.map((item) => {
+  let inviteeList = await models.InvitationCodes.findAll(condition);
+  inviteeList = inviteeList.map((item) => {
     return item["inviter_address"];
   });
-
-  const reservedInvitees = reservedInviteeList.length;
-  const reserveContributions = new BigNumber(reservedInvitees).multipliedBy(
-    KSM_RESERVATION_AMOUNT
-  );
-
-  //第二批，没预约过的被邀请人
-  let unreservedCondition = {
-    where: {
-      $and: [{ invited_by_address: account }, { if_authenticated: false }], // 被邀请的账户，无论被邀请账户是否预约过，他的投票都算进去别人的邀请金额里面
-    },
-    attributes: ["inviter_address"],
-    raw: true, // 获取object array
-  };
-
-  let unreservedInviteeList = await models.InvitationCodes.findAll(
-    unreservedCondition
-  );
-
-  unreservedInviteeList = unreservedInviteeList.map((item) => {
-    return item["inviter_address"];
-  });
-
-  // 邀请人总列表：预约邀请人 + 非预约邀请人
-  const inviteeList = reservedInviteeList.concat(unreservedInviteeList);
 
   let bondList = [];
   if (inviteeList.length != 0) {
@@ -203,37 +174,16 @@ export const getInvitationData = async (account, models) => {
     });
   }
 
-  // 计算下线在正式投票阶段的贡献额
-  // 已预约的贡献额
-  let reservedQueryString = null;
-  if (reservedInviteeList.length > 0) {
-    reservedQueryString = `"time" >= to_timestamp(${timeRecord.salp_whitelist_start_time}) AND \
-                            "time"  <= to_timestamp(${timeRecord.salp_end_time}) AND \
-                            "from" IN `;
-    // 整理列表格式
-    reservedQueryString += getStringQueryList(reservedInviteeList);
-  }
-
-  // 未预约的贡献额
-  let unreservedQueryString = null;
-  if (unreservedInviteeList.length > 0) {
-    unreservedQueryString = `"time" >= to_timestamp(${timeRecord.salp_start_time}) AND \
-    "time"  <= to_timestamp(${timeRecord.salp_end_time}) AND \
-    "from" IN `;
-    // 整理列表格式
-    unreservedQueryString += getStringQueryList(unreservedInviteeList);
-  }
-
   // 计算合总贡献额
   let queryString = null;
   let invitationContributions = new BigNumber(0);
 
-  if (reservedQueryString && unreservedQueryString) {
-    queryString = `WHERE (${reservedQueryString}) OR (${unreservedQueryString})`;
-  } else if (reservedQueryString) {
-    queryString = `WHERE ${reservedQueryString}`;
-  } else if (unreservedQueryString) {
-    queryString = `WHERE ${unreservedQueryString}`;
+  // 从开始预约的时间到salp结束的时间来算，涵盖所有预约投票金额和正式投票金额
+  if (inviteeList.length > 0) {
+    queryString = `WHERE "time" >= to_timestamp(${timeRecord.invitation_start_time}) AND \
+    "time"  <= to_timestamp(${timeRecord.salp_end_time}) AND \
+    "from" IN ${getStringQueryList(inviteeList)}
+    `;
   }
 
   if (queryString) {
@@ -245,9 +195,6 @@ export const getInvitationData = async (account, models) => {
       invitationContributions = new BigNumber(result[0].sum);
     }
   }
-
-  // 投票阶段的投票金额+预约每个人头算0.01个KSM = 总可计算金额
-  invitationContributions = invitationContributions.plus(reserveContributions);
 
   // 查出accountInvitationList，即符合时间条件的下线的交易列表
   let accountInvitationList = [];
@@ -335,26 +282,15 @@ export const getRewardedPersonalContributions = async (account, models) => {
 
   // 算预约阶段的奖励
   const ifReserved = await queryIfReserved(account, models);
-  let reservationContributions = new BigNumber(0);
-  if (ifReserved) {
-    reservationContributions = new BigNumber(KSM_RESERVATION_AMOUNT);
-  }
-
   let queryString = `WHERE "from" = '${account}' AND \
                               "to" IN ${getStringQueryList(
                                 MULTISIG_ACCOUNT
                               )} AND \
                               "time"  <= to_timestamp(${
                                 timeRecord.salp_end_time
-                              }) AND 
+                              }) AND \
+                              "time" >= to_timestamp(${timeRecord.invitation_start_time})
                               `;
-
-  // 判断该账户是否已预约，根据预约的情况，从不同的时间开始计算参与奖励的contributions
-  if (ifReserved) {
-    queryString += `"time" >= to_timestamp(${timeRecord.salp_whitelist_start_time})`;
-  } else {
-    queryString += `"time" >= to_timestamp(${timeRecord.salp_start_time})`;
-  }
 
   const result = await sequelize.query(
     `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
@@ -366,7 +302,7 @@ export const getRewardedPersonalContributions = async (account, models) => {
     rewardedPersonalContributions = new BigNumber(result[0].sum);
   }
 
-  return rewardedPersonalContributions.plus(reservationContributions);
+  return rewardedPersonalContributions;
 };
 
 // **************************************
