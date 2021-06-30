@@ -5,7 +5,7 @@ import { QueryTypes } from "sequelize";
 dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址列表
-export const KSM_RESERVATION_AMOUNT = 10000000000; // 1^10 = 0.01 KSM
+export const KSM_AUTHENTICATION_AMOUNT = 10000000000; // 1^11 = 0.1 KSM
 
 // *************************
 // return bignumber format. Only valid for single layer filed.
@@ -214,9 +214,27 @@ export const getInvitationData = async (account, models) => {
 };
 
 // *************************
-// 查询用户是否是在白名单内。是否在白名单内有两个条件，第1是有邀请码记录。第2是if_authenticated是true的状态。
+// 查询用户是是预约名单内的成员。
 export const queryIfReserved = async (account, models) => {
   const condition = { where: { inviter_address: account } };
+  const rs = await models.InvitationCodes.findOne(condition);
+
+  if (rs && rs.if_reserved) {
+    return true;
+  } else {
+    return false;
+  }
+};
+
+// *************************
+// 查询用户是否激活了邀请码。激活邀请码有两个条件，第1是有邀请码记录。第2是if_authenticated是true的状态。
+export const queryIfAuthenticated = async (account, models) => {
+  const condition = { where: {
+    $and: [
+      { inviter_address: account },
+      {inviter_code: {$not: null}}
+     ]}
+  };
   const rs = await models.InvitationCodes.findOne(condition);
 
   if (rs) {
@@ -242,8 +260,8 @@ export const queryIfReserved = async (account, models) => {
 export const authenticateReserveTransaction = async (account, models) => {
   const timeRecord = await models.SalpOverviews.findOne({});
 
-  // 获取预约开始和结束时间
-  const queryString = `WHERE "from" = '${account}' AND \
+  // 转账至多签账户，获取预约开始和SALP结束时间
+  const queryString1 = `WHERE "from" = '${account}' AND \
                              "to" IN ${getStringQueryList(
                                MULTISIG_ACCOUNT
                              )} AND \
@@ -251,24 +269,31 @@ export const authenticateReserveTransaction = async (account, models) => {
                                timeRecord.invitation_start_time
                              }) AND \
                              "time"  <= to_timestamp(${
-                               timeRecord.invitation_end_time
+                               timeRecord.salp_end_time
                              })
                              `;
 
-  const result = await sequelize.query(
-    `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
+  const result1 = await sequelize.query(
+    `SELECT SUM(amount::bigint) FROM transactions ${queryString1} `,
     { type: QueryTypes.SELECT }
   );
 
-  if (!result[0].sum || result[0].sum == "0") {
-    return false;
+
+  // 计算在官网投票的personalContributions
+  const queryString2 = `WHERE "para_id" = '2001' AND "account_id" = '${account}'`;
+  const result2 = await sequelize.query(
+    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString2} `,
+    { type: QueryTypes.SELECT }
+  );
+
+  let sum1 = result1[0].sum? new BigNumber(result1[0].sum):new BigNumber(0);
+  let sum2 = result2[0].sum? new BigNumber(result2[0].sum):new BigNumber(0);
+  let contributionValue = sum1.plus(sum2);
+
+  if (contributionValue.isGreaterThanOrEqualTo(KSM_AUTHENTICATION_AMOUNT)) {
+    return true;
   } else {
-    const contributionValue = new BigNumber(result[0].sum);
-    if (contributionValue.isGreaterThanOrEqualTo(KSM_RESERVATION_AMOUNT)) {
-      return true;
-    } else {
-      return false;
-    }
+    return false;
   }
 };
 
@@ -279,9 +304,7 @@ export const authenticateReserveTransaction = async (account, models) => {
 
 export const getRewardedPersonalContributions = async (account, models) => {
   const timeRecord = await models.SalpOverviews.findOne({});
-
-  // 算预约阶段的奖励
-  const ifReserved = await queryIfReserved(account, models);
+  
   let queryString = `WHERE "from" = '${account}' AND \
                               "to" IN ${getStringQueryList(
                                 MULTISIG_ACCOUNT
@@ -445,7 +468,7 @@ export const calculateSelfReward = async (account, models) => {
   const airdropCondition = { where: { inviter_address: account } };
   const rs = await models.InvitationCodes.findOne(airdropCondition);
 
-  if (rs && rs.if_authenticated == true) {
+  if (rs && rs.if_reserved == true) {
     straightReward = straightReward.plus(new BigNumber(1143641354071));
   }
 

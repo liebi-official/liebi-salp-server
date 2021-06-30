@@ -68,11 +68,12 @@ const Contributions = gql`
     ): ContributionsData
     # 查询用户是否已预约，即是否在白名单内
     ifReserved(account: String!): Boolean
+    # 查询用户是否已激活邀请码
+    ifAuthenticated(account: String!): Boolean
     ifBind(account: String!): InvitationCodeData
   }
 
   type Mutation {
-    # 预约：进入白名单+生成邀请码
     generateInvitationCode(input: CodeGenerationInput): InvitationCodeData
     bindInviter(input: CodeGenerationInput): BidingStatus
   }

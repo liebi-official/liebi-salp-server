@@ -6,6 +6,7 @@ const Op = Sequelize.Op;
 const sequelize = new Sequelize(process.env.POSTGRESQL_URI, {
   dialect: "postgres",
   operatorsAliases: {
+    $not: Op.not,
     $and: Op.and,
     $or: Op.or,
     $eq: Op.eq,

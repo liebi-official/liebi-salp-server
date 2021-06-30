@@ -23,6 +23,9 @@ const invitation_codes = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         allowNull: false,
       },
+      if_reserved: {
+        type: DataTypes.BOOLEAN,
+      }
     },
     {
       underscored: true,

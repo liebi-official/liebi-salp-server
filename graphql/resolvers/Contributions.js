@@ -4,6 +4,7 @@ import {
   campaignInfoInitialization,
   getInvitationData,
   queryIfReserved,
+  queryIfAuthenticated,
   authenticateReserveTransaction,
   calculateSelfReward,
   calculateInvitingReward,
@@ -39,10 +40,10 @@ const Contributions = {
       };
     },
     getInvitationCodeByAccount: async (parent, { account }, { models }) => {
-      // 查询一下是否reserve了，如果是的话，就是查询和返回。如果不是的话，就返回none.
+      // 查询一下是否已生成过邀请码且已经激活过了，如果是的话，就是查询和返回。如果不是的话，就返回none.
       let record = await models.InvitationCodes.findOne({
         where: {
-          $and: [{ inviter_address: account }, { if_authenticated: true }],
+          $and: [{ inviter_address: account }, { if_authenticated: true }, {inviter_code: {$not: null}}],
         },
       });
 
@@ -114,8 +115,12 @@ const Contributions = {
       };
     },
     ifReserved: async (parent, { account }, { models }) => {
-      // 查询个人的贡献值
+      // 查询用户是否已预约，即是否在白名单内
       return await queryIfReserved(account, models);
+    },
+    ifAuthenticated: async (parent, { account }, { models }) => {
+      // 查询用户是否已激活邀请码
+      return await queryIfAuthenticated(account, models);
     },
     ifBind: async (parent, { account }, { models }) => {
       // 查询该账户是否有邀请人，有的话返回true，没有的话，返回false
@@ -171,27 +176,17 @@ const Contributions = {
         };
       }
 
-      // 再检查账户是否已经生成过邀请码
+      // 查询该账户是否在invitation_codes表里有记录
       let record = await models.InvitationCodes.findOne({
         where: { inviter_address: account },
       });
 
-      // status值为"new", "existing", "none", "invalid_inviter_code", "inviter_code_different_from_previous","invalid_code_generation_time", 中的一种
-      if (record) {
-        if (record.inviter_code) {
-          return {
-            invitationCode: record.inviter_code,
-            status: "existing",
-          };
-        } else {
-          // 说明先绑定了，但没成生成邀请码
-          if (inviteRecord.inviter_code != invited_by_code) {
-            // 原来绑定用的邀请人代码跟现在传入的不一样
+      // 再检查账户是否已经生成过邀请码且激活过
+      if (record && record.inviter_code && record.if_authenticated) {
             return {
-              status: "inviter_code_different_from_previous",
-            };
-          }
-        }
+              invitationCode: record.inviter_code,
+              status: "existing",
+        };
       }
 
       // 最后判断是否处于邀请码生成的活动时间内，如果不是，则返回不在有效生成时间内
@@ -208,38 +203,52 @@ const Contributions = {
         };
       }
 
-      // 生成邀请码
-      while (true) {
-        let newInvitationCode = getRandomCombination();
-
-        // 检查邀请码是否有重复
-        let rs = await models.InvitationCodes.findOne({
-          where: { inviter_code: newInvitationCode },
-        });
-
-        if (!rs) {
-          // 查询一下是否有抓取到预约交易，如果有的话，if_authenticated值为true,否则为false
-          // 原来绑定过就更新，没绑定过就插入一条新记录
-          const auth = await authenticateReserveTransaction(account, models);
-
-          await models.InvitationCodes.upsert({
-            inviter_address: account,
-            inviter_code: newInvitationCode,
-            invited_by_address: inviteRecord.inviter_address,
-            if_authenticated: auth,
+      // 如果原来有邀请码的，就用原来的，没有就重新生成
+      let newInvitationCode = record.inviter_code;
+      if(!newInvitationCode) {
+        while (true) {
+          newInvitationCode = getRandomCombination();
+  
+          // 检查邀请码是否有重复
+          let rs = await models.InvitationCodes.findOne({
+            where: { inviter_code: newInvitationCode },
           });
-          break;
+          if (!rs) {
+            break;
+          }
         }
       }
 
-      let newRecord = await models.InvitationCodes.findOne({
-        where: { inviter_address: account },
+      // 查询一下是否有抓取到预约交易，如果有的话，if_authenticated值为true,否则为false
+      // 原来绑定过就更新，没绑定过就插入一条新记录
+      // 原来就绑定了邀请人的话，就沿用原来的邀请人。没有的话，就用新传入的邀请人。
+      const auth = await authenticateReserveTransaction(account, models);
+
+      await models.InvitationCodes.upsert({
+        inviter_address: account,
+        inviter_code: newInvitationCode,
+        invited_by_address: record.invited_by_address || inviteRecord.inviter_address,
+        if_authenticated: auth,
       });
 
-      return {
-        invitationCode: newRecord.inviter_code,
-        status: "new",
-      };
+      let newRecord = await models.InvitationCodes.findOne({
+        where: { 
+          $and: [ 
+            {inviter_address: account },
+            {if_authenticated: true}
+          ]}
+      });
+
+      if (newRecord) {  // 已激活
+        return {
+          invitationCode: newRecord.inviter_code,
+          status: "new",
+        };
+      } else {  // 未激活，说明投票不足0.1个ksm标准
+        return {
+          status: "not_meet_contribution_standard",
+        };
+      }
     },
     bindInviter: async (parent, { input }, { models }) => {
       let { account, invited_by_code } = input;
@@ -252,7 +261,11 @@ const Contributions = {
 
       // 检查账户是否有绑定过邀请码，如果已绑定，刚返回错误
       let record = await models.InvitationCodes.findOne({
-        where: { inviter_address: account },
+        where: { 
+          $and: [
+            {inviter_address: account },
+            {invited_by_address: {$not: null}}
+          ]}
       });
 
       // status值为"ok", "exist", "none", "invalid_inviter_code", 中的一种
@@ -273,11 +286,11 @@ const Contributions = {
         };
       }
 
-      await models.InvitationCodes.create({
+      await models.InvitationCodes.upsert({
         inviter_address: account,
-        inviter_code: null,
+        inviter_code: record?.inviter_code || null,
         invited_by_address: inviteRecord.inviter_address,
-        if_authenticated: false,
+        if_authenticated: record?.if_authenticated || false,
       });
 
       return {
