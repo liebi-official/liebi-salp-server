@@ -43,7 +43,11 @@ const Contributions = {
       // 查询一下是否已生成过邀请码且已经激活过了，如果是的话，就是查询和返回。如果不是的话，就返回none.
       let record = await models.InvitationCodes.findOne({
         where: {
-          $and: [{ inviter_address: account }, { if_authenticated: true }, {inviter_code: {$not: null}}],
+          $and: [
+            { inviter_address: account },
+            { if_authenticated: true },
+            { inviter_code: { $not: null } },
+          ],
         },
       });
 
@@ -165,15 +169,19 @@ const Contributions = {
         await campaignInfoInitialization(models);
       }
 
-      // 判断邀请人的邀请码是否有效。无效则返回邀请人无效
-      let inviteRecord = await models.InvitationCodes.findOne({
-        where: { inviter_code: invited_by_code },
-      });
+      let inviteRecord;
+      // 如果填了邀请码
+      if (invited_by_code) {
+        // 判断邀请人的邀请码是否有效。无效则返回邀请人无效
+        inviteRecord = await models.InvitationCodes.findOne({
+          where: { inviter_code: invited_by_code },
+        });
 
-      if (!inviteRecord) {
-        return {
-          status: "invalid_inviter_code",
-        };
+        if (!inviteRecord) {
+          return {
+            status: "invalid_inviter_code",
+          };
+        }
       }
 
       // 查询该账户是否在invitation_codes表里有记录
@@ -183,9 +191,9 @@ const Contributions = {
 
       // 再检查账户是否已经生成过邀请码且激活过
       if (record && record.inviter_code && record.if_authenticated) {
-            return {
-              invitationCode: record.inviter_code,
-              status: "existing",
+        return {
+          invitationCode: record.inviter_code,
+          status: "existing",
         };
       }
 
@@ -204,11 +212,11 @@ const Contributions = {
       }
 
       // 如果原来有邀请码的，就用原来的，没有就重新生成
-      let newInvitationCode = record.inviter_code;
-      if(!newInvitationCode) {
+      let newInvitationCode = record?.inviter_code;
+      if (!newInvitationCode) {
         while (true) {
           newInvitationCode = getRandomCombination();
-  
+
           // 检查邀请码是否有重复
           let rs = await models.InvitationCodes.findOne({
             where: { inviter_code: newInvitationCode },
@@ -227,24 +235,25 @@ const Contributions = {
       await models.InvitationCodes.upsert({
         inviter_address: account,
         inviter_code: newInvitationCode,
-        invited_by_address: record.invited_by_address || inviteRecord.inviter_address,
+        invited_by_address:
+          record?.invited_by_address || inviteRecord?.inviter_address || null,
         if_authenticated: auth,
       });
 
       let newRecord = await models.InvitationCodes.findOne({
-        where: { 
-          $and: [ 
-            {inviter_address: account },
-            {if_authenticated: true}
-          ]}
+        where: {
+          $and: [{ inviter_address: account }, { if_authenticated: true }],
+        },
       });
 
-      if (newRecord) {  // 已激活
+      if (newRecord) {
+        // 已激活
         return {
           invitationCode: newRecord.inviter_code,
           status: "new",
         };
-      } else {  // 未激活，说明投票不足0.1个ksm标准
+      } else {
+        // 未激活，说明投票不足0.1个ksm标准
         return {
           status: "not_meet_contribution_standard",
         };
@@ -261,11 +270,12 @@ const Contributions = {
 
       // 检查账户是否有绑定过邀请码，如果已绑定，刚返回错误
       let record = await models.InvitationCodes.findOne({
-        where: { 
+        where: {
           $and: [
-            {inviter_address: account },
-            {invited_by_address: {$not: null}}
-          ]}
+            { inviter_address: account },
+            { invited_by_address: { $not: null } },
+          ],
+        },
       });
 
       // status值为"ok", "exist", "none", "invalid_inviter_code", 中的一种

@@ -49,7 +49,7 @@ const Contributions = gql`
 
   input CodeGenerationInput {
     account: String!
-    invited_by_code: String!
+    invited_by_code: String
   }
 
   type Query {
