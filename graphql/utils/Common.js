@@ -128,7 +128,7 @@ export const getInvitationData = async (account, models) => {
 
   //第一批，已经预约过的被邀请人
   let condition = {
-    where: {invited_by_address: account}, // 被邀请的账户，无论被邀请账户是否预约过，他的投票都算进去别人的邀请金额里面
+    where: { invited_by_address: account }, // 被邀请的账户，无论被邀请账户是否预约过，他的投票都算进去别人的邀请金额里面
     attributes: ["inviter_address"],
     raw: true, // 获取object array
   };
@@ -180,7 +180,9 @@ export const getInvitationData = async (account, models) => {
 
   // 从开始预约的时间到salp结束的时间来算，涵盖所有预约投票金额和正式投票金额
   if (inviteeList.length > 0) {
-    queryString = `WHERE "time" >= to_timestamp(${timeRecord.invitation_start_time}) AND \
+    queryString = `WHERE "time" >= to_timestamp(${
+      timeRecord.invitation_start_time
+    }) AND \
     "time"  <= to_timestamp(${timeRecord.salp_end_time}) AND \
     "from" IN ${getStringQueryList(inviteeList)}
     `;
@@ -229,11 +231,10 @@ export const queryIfReserved = async (account, models) => {
 // *************************
 // 查询用户是否激活了邀请码。激活邀请码有两个条件，第1是有邀请码记录。第2是if_authenticated是true的状态。
 export const queryIfAuthenticated = async (account, models) => {
-  const condition = { where: {
-    $and: [
-      { inviter_address: account },
-      {inviter_code: {$not: null}}
-     ]}
+  const condition = {
+    where: {
+      $and: [{ inviter_address: account }, { inviter_code: { $not: null } }],
+    },
   };
   const rs = await models.InvitationCodes.findOne(condition);
 
@@ -278,7 +279,6 @@ export const authenticateReserveTransaction = async (account, models) => {
     { type: QueryTypes.SELECT }
   );
 
-
   // 计算在官网投票的personalContributions
   const queryString2 = `WHERE "para_id" = '2001' AND "account_id" = '${account}'`;
   const result2 = await sequelize.query(
@@ -286,8 +286,8 @@ export const authenticateReserveTransaction = async (account, models) => {
     { type: QueryTypes.SELECT }
   );
 
-  let sum1 = result1[0].sum? new BigNumber(result1[0].sum):new BigNumber(0);
-  let sum2 = result2[0].sum? new BigNumber(result2[0].sum):new BigNumber(0);
+  let sum1 = result1[0].sum ? new BigNumber(result1[0].sum) : new BigNumber(0);
+  let sum2 = result2[0].sum ? new BigNumber(result2[0].sum) : new BigNumber(0);
   let contributionValue = sum1.plus(sum2);
 
   if (contributionValue.isGreaterThanOrEqualTo(KSM_AUTHENTICATION_AMOUNT)) {
@@ -304,7 +304,7 @@ export const authenticateReserveTransaction = async (account, models) => {
 
 export const getRewardedPersonalContributions = async (account, models) => {
   const timeRecord = await models.SalpOverviews.findOne({});
-  
+
   let queryString = `WHERE "from" = '${account}' AND \
                               "to" IN ${getStringQueryList(
                                 MULTISIG_ACCOUNT
@@ -312,7 +312,9 @@ export const getRewardedPersonalContributions = async (account, models) => {
                               "time"  <= to_timestamp(${
                                 timeRecord.salp_end_time
                               }) AND \
-                              "time" >= to_timestamp(${timeRecord.invitation_start_time})
+                              "time" >= to_timestamp(${
+                                timeRecord.invitation_start_time
+                              })
                               `;
 
   const result = await sequelize.query(
@@ -366,7 +368,7 @@ export const calculateExtendedInvitingReward = async (account, models) => {
 
   let invitationContributions = new BigNumber(0);
   if (result[0].sum) {
-    const invitationContributions = result[0].sum;
+    invitationContributions = result[0].sum;
   }
 
   const invitationStraightReward = new BigNumber(
@@ -464,7 +466,7 @@ export const calculateSelfReward = async (account, models) => {
     record.straight_reward_coefficient
   ).multipliedBy(rewardedPersonalContributions);
 
-  // 如果用户是已预约成功的用户，则可获得额外的 50000/43720=1143641354071 个BNC
+  // 如果用户是已预约成功的用户，则可获得额外的 50000/43720=1143641354071 个BNC的空投
   const airdropCondition = { where: { inviter_address: account } };
   const rs = await models.InvitationCodes.findOne(airdropCondition);
 
