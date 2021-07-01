@@ -197,19 +197,19 @@ const Contributions = {
         };
       }
 
-      // 最后判断是否处于邀请码生成的活动时间内，如果不是，则返回不在有效生成时间内
-      let currentTimestamp = Math.round(new Date().getTime() / 1000);
+      // // 最后判断是否处于邀请码生成的活动时间内，如果不是，则返回不在有效生成时间内
+      // let currentTimestamp = Math.round(new Date().getTime() / 1000);
 
-      const campaignInfo = await models.SalpOverviews.findOne();
+      // const campaignInfo = await models.SalpOverviews.findOne();
 
-      if (
-        currentTimestamp < campaignInfo.invitation_start_time ||
-        currentTimestamp > campaignInfo.invitation_end_time
-      ) {
-        return {
-          status: "invalid_code_generation_time",
-        };
-      }
+      // if (
+      //   currentTimestamp < campaignInfo.invitation_start_time ||
+      //   currentTimestamp > campaignInfo.invitation_end_time
+      // ) {
+      //   return {
+      //     status: "invalid_code_generation_time",
+      //   };
+      // }
 
       // 如果原来有邀请码的，就用原来的，没有就重新生成
       let newInvitationCode = record?.inviter_code;
