@@ -423,7 +423,12 @@ export const calculateExtendedSelfReward = async (account, models) => {
 
   // 看是否在表里，在表里就是绑定过邀请码的
   const condition = {
-    where: { inviter_address: account },
+    where: {
+      $and: [
+        { inviter_address: account },
+        { invited_by_address: { $not: null } },
+      ],
+    },
     raw: true, // 获取object array
   };
 
@@ -483,7 +488,12 @@ export const calculateSelfReward = async (account, models) => {
 
   // 看是否在表里，在表里就是绑定过邀请码的
   const condition = {
-    where: { inviter_address: account },
+    where: {
+      $and: [
+        { inviter_address: account },
+        { invited_by_address: { $not: null } },
+      ],
+    },
     raw: true, // 获取object array
   };
 
