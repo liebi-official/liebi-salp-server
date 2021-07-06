@@ -10,6 +10,7 @@ dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址
 const LIQUIDITY_RATE = 0.05;
+const KSM_PRECISION = 1000000000000;
 
 const getMultisigAccountHistoricalBalance = async (models) => {
   // 只要是转账到多签账户的交易都计算入内
@@ -218,7 +219,14 @@ const Campaign = {
       return result.slice(626);
     },
     getLeadingAmount: async (parent, {}, { models }) => {
-      const rewardLevel = [0, 5000, 8000, 12000, 20000, 30000];
+      const rewardLevel = [
+        0,
+        5000 * KSM_PRECISION,
+        8000 * KSM_PRECISION,
+        12000 * KSM_PRECISION,
+        20000 * KSM_PRECISION,
+        30000 * KSM_PRECISION,
+      ];
       const rewardCoefficient = [2, 2.1, 2.2, 2.3, 2.4, 2.5];
 
       // 确保Coefficients表有值

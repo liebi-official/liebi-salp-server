@@ -5,7 +5,7 @@ import { QueryTypes } from "sequelize";
 dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址列表
-export const KSM_AUTHENTICATION_AMOUNT = 10000000000; // 1^11 = 0.1 KSM
+export const KSM_AUTHENTICATION_AMOUNT = 100000000000; // 10^11 = 0.1 KSM
 
 // *************************
 // return bignumber format. Only valid for single layer filed.
