@@ -189,9 +189,9 @@ const Campaign = {
       )}`;
 
       const recordQueryString = `
-      SELECT balance_of::bigint "amount", "time" FROM contributeds  ${queryString2} 
+      SELECT extrinsic_id, balance_of::bigint "amount", "time" FROM contributeds  ${queryString2} 
       UNION 
-      SELECT amount::bigint, "time" FROM transactions ${queryString}
+      SELECT extrinsic_id, amount::bigint, "time" FROM transactions ${queryString}
       ORDER BY "time" DESC `;
 
       const dataString = `SELECT date_trunc('hour', time) as "time", amount::bigint 
