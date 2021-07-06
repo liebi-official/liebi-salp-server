@@ -192,7 +192,7 @@ const Campaign = {
       SELECT balance_of::bigint "amount", "time" FROM contributeds  ${queryString2} 
       UNION 
       SELECT amount::bigint, "time" FROM transactions ${queryString}
-      ORDER BY "time" DESC `
+      ORDER BY "time" DESC `;
 
       const dataString = `SELECT date_trunc('hour', time) as "time", amount::bigint 
       FROM (${recordQueryString}) union_table`;
@@ -205,18 +205,86 @@ const Campaign = {
                           ON time_table.time = data_table.time
                           GROUP BY time_table.time
                           `;
-      
+
       const cumulativeString = `SELECT time, SUM(accumulated) OVER
                                 (ORDER BY time ASC rows between unbounded preceding and current row) accumulated 
                                 FROM (${mainString}) as data`;
 
+      const result = await sequelize.query(`${cumulativeString}`, {
+        type: QueryTypes.SELECT,
+      });
+
+      // 截取预约结束时间6-9 19:00开始的数据, 30* 24 +5
+      return result.slice(626);
+    },
+    getLeadingAmount: async (parent, {}, { models }) => {
+      const rewardLevel = [0, 5000, 8000, 12000, 20000, 30000];
+      const rewardCoefficient = [2, 2.1, 2.2, 2.3, 2.4, 2.5];
+
+      // 确保Coefficients表有值
+      let recordNum = await models.Coefficients.count();
+      if (recordNum == 0) {
+        await campaignInfoInitialization(models);
+      }
+
+      let record = await models.Coefficients.findOne();
+
+      // 按para_id将各个链筹得的钱分组。然后找到2001,计算它和下一名的差额。且要保证2001的排名<=4
+      // 计算在官网投票的personalContributions
+      const queryString = `GROUP BY "para_id" ORDER BY "sum" DESC`;
       const result = await sequelize.query(
-        `${cumulativeString}`,
+        `SELECT para_id, SUM(balance_of::bigint) FROM contributeds ${queryString} `,
         { type: QueryTypes.SELECT }
       );
 
-      // 截取预约结束时间6-9 19:00开始的数据, 30* 24 +5
-      return result.slice(626); 
+      let leadingAmount = new BigNumber(0);
+      for (let i = 0; i < result.length - 1; i++) {
+        if (result[i].para_id == "2001") {
+          if (i == 3) {
+            // 如果我们是第4名，则用我们的值减去下一名的。如果我们不是第4名，则用我们的值减去第4名
+            leadingAmount = new BigNumber(result[i].sum).minus(
+              result[i + 1].sum
+            );
+          } else {
+            leadingAmount = new BigNumber(result[i].sum).minus(result[3].sum);
+          }
+
+          let level = 0;
+          for (let j = 0; j < 6; j++) {
+            if (leadingAmount.isGreaterThanOrEqualTo(rewardLevel[j])) {
+              level = j;
+            }
+          }
+
+          let newData = {};
+          if (record.straight_reward_coefficient != rewardCoefficient[level]) {
+            newData = {
+              straight_reward_coefficient: rewardCoefficient[level],
+              successful_auction_reward_coefficient:
+                rewardCoefficient[level] * 10,
+            };
+
+            const condition = {
+              where: { id: 1 },
+            };
+
+            await models.Coefficients.update(newData, condition);
+          }
+        }
+      }
+
+      return leadingAmount.toFixed(0);
+    },
+    getCurrentRewardingPercent: async (parent, {}, { models }) => {
+      // 确保Coefficients表有值
+      let recordNum = await models.Coefficients.count();
+      if (recordNum == 0) {
+        await campaignInfoInitialization(models);
+      }
+
+      let record = await models.Coefficients.findOne({});
+
+      return record.straight_reward_coefficient;
     },
   },
 };
