@@ -51,6 +51,7 @@ const Campaign = gql`
     getAccumulatedContributionsSeries: [accumulatedData]
     getLeadingAmount: String  # 获取领先后一名的KSM金额
     getCurrentRewardingPercent: Float # 获取当前的奖励档位
+    getWarriors: [String] # 获取每一档的冲刺者名单
   }
 `;
 

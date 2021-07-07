@@ -26,6 +26,7 @@ const models = {
   Coefficients: require("./coefficients").default(sequelize, Sequelize),
   Memoupdateds: require("./memoupdateds").default(sequelize, Sequelize),
   Contributeds: require("./contributeds").default(sequelize, Sequelize),
+  Warriors: require("./Warriors").default(sequelize, Sequelize),
 };
 
 Object.keys(models).forEach((key) => {

@@ -294,6 +294,20 @@ const Campaign = {
 
       return record.straight_reward_coefficient;
     },
+    getWarriors: async (parent, {}, { models }) => {
+      const condition = {
+        attributes: ["winner"],
+        where: { id: {$gt: 0} },
+        order: [['id', 'ASC']],
+        raw: true, // 获取object array
+      }; 
+      let record = await models.Warriors.findAll(condition);
+      let result = record.map(item => {
+        return item.winner;
+      });
+
+      return result;
+    },
   },
 };
 
