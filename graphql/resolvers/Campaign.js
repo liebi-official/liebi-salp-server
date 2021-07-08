@@ -221,11 +221,11 @@ const Campaign = {
     getLeadingAmount: async (parent, {}, { models }) => {
       const rewardLevel = [
         0,
+        5 * KSM_PRECISION,
+        50 * KSM_PRECISION,
+        500 * KSM_PRECISION,
         5000 * KSM_PRECISION,
-        8000 * KSM_PRECISION,
-        12000 * KSM_PRECISION,
-        20000 * KSM_PRECISION,
-        30000 * KSM_PRECISION,
+        10000 * KSM_PRECISION,
       ];
       const rewardCoefficient = [2, 2.1, 2.2, 2.3, 2.4, 2.5];
 
@@ -257,12 +257,21 @@ const Campaign = {
             leadingAmount = new BigNumber(result[i].sum).minus(result[3].sum);
           }
 
+          console.log("leadingAmount: ", leadingAmount);
+
           let level = 0;
           for (let j = 0; j < 6; j++) {
+            console.log("rewardLevelj: ", rewardLevel[j]);
+
+
             if (leadingAmount.isGreaterThanOrEqualTo(rewardLevel[j])) {
               level = j;
             }
           }
+
+          console.log("record.straight_reward_coefficient: ", record.straight_reward_coefficient);
+          console.log("level: ", level);
+          console.log("rewardCoefficient: ", rewardCoefficient[level]);
 
           let newData = {};
           if (record.straight_reward_coefficient != rewardCoefficient[level]) {
