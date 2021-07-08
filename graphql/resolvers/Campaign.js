@@ -239,22 +239,24 @@ const Campaign = {
 
       // 按para_id将各个链筹得的钱分组。然后找到2001,计算它和下一名的差额。且要保证2001的排名<=4
       // 计算在官网投票的personalContributions
-      const queryString = `GROUP BY "para_id" ORDER BY "sum" DESC`;
+      const queryString = `WHERE para_id NOT IN ('2000', '2023', '2007') GROUP BY "para_id" ORDER BY "sum" DESC`;
       const result = await sequelize.query(
         `SELECT para_id, SUM(balance_of::bigint) FROM contributeds ${queryString} `,
         { type: QueryTypes.SELECT }
       );
 
+      console.log("result: ", result);
+
       let leadingAmount = new BigNumber(0);
       for (let i = 0; i < result.length - 1; i++) {
         if (result[i].para_id == "2001") {
-          if (i == 3) {
-            // 如果我们是第4名，则用我们的值减去下一名的。如果我们不是第4名，则用我们的值减去第4名
+          if (i == 0) {
+            // 如果我们是第1名，则用我们的值减去下一名的。如果我们不是第1名，则用我们的值减去第1名
             leadingAmount = new BigNumber(result[i].sum).minus(
               result[i + 1].sum
             );
           } else {
-            leadingAmount = new BigNumber(result[i].sum).minus(result[3].sum);
+            leadingAmount = new BigNumber(result[i].sum).minus(result[0].sum);
           }
 
           console.log("leadingAmount: ", leadingAmount);
@@ -263,13 +265,15 @@ const Campaign = {
           for (let j = 0; j < 6; j++) {
             console.log("rewardLevelj: ", rewardLevel[j]);
 
-
             if (leadingAmount.isGreaterThanOrEqualTo(rewardLevel[j])) {
               level = j;
             }
           }
 
-          console.log("record.straight_reward_coefficient: ", record.straight_reward_coefficient);
+          console.log(
+            "record.straight_reward_coefficient: ",
+            record.straight_reward_coefficient
+          );
           console.log("level: ", level);
           console.log("rewardCoefficient: ", rewardCoefficient[level]);
 
@@ -306,12 +310,12 @@ const Campaign = {
     getWarriors: async (parent, {}, { models }) => {
       const condition = {
         attributes: ["winner"],
-        where: { id: {$gt: 0} },
-        order: [['id', 'ASC']],
+        where: { id: { $gt: 0 } },
+        order: [["id", "ASC"]],
         raw: true, // 获取object array
-      }; 
+      };
       let record = await models.Warriors.findAll(condition);
-      let result = record.map(item => {
+      let result = record.map((item) => {
         return item.winner;
       });
 
