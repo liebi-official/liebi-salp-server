@@ -221,13 +221,13 @@ const Campaign = {
     getLeadingAmount: async (parent, {}, { models }) => {
       const rewardLevel = [
         0,
-        5 * KSM_PRECISION,
-        50 * KSM_PRECISION,
-        500 * KSM_PRECISION,
-        5000 * KSM_PRECISION,
-        10000 * KSM_PRECISION,
+        10005 * KSM_PRECISION,
+        10050 * KSM_PRECISION,
+        10500 * KSM_PRECISION,
+        15000 * KSM_PRECISION,
+        20000 * KSM_PRECISION,
       ];
-      const rewardCoefficient = [2, 2.1, 2.2, 2.3, 2.4, 2.5];
+      const rewardCoefficient = [2, 2, 2, 2, 2, 2];
 
       // 确保Coefficients表有值
       let recordNum = await models.Coefficients.count();
@@ -239,7 +239,7 @@ const Campaign = {
 
       // 按para_id将各个链筹得的钱分组。然后找到2001,计算它和下一名的差额。且要保证2001的排名<=4
       // 计算在官网投票的personalContributions
-      const queryString = `WHERE para_id NOT IN ('2000', '2023', '2007') GROUP BY "para_id" ORDER BY "sum" DESC`;
+      const queryString = `WHERE para_id NOT IN ('2000', '2004', '2023', '2007') GROUP BY "para_id" ORDER BY "sum" DESC`;
       const result = await sequelize.query(
         `SELECT para_id, SUM(balance_of::bigint) FROM contributeds ${queryString} `,
         { type: QueryTypes.SELECT }
