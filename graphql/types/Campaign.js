@@ -49,9 +49,10 @@ const Campaign = gql`
       recordNum: Int = 5 # 指的是每页几条记录，默认值为5
     ): [ContributionRecord]
     getAccumulatedContributionsSeries: [accumulatedData]
-    getLeadingAmount: String  # 获取领先后一名的KSM金额
+    getLeadingAmount: String # 获取领先后一名的KSM金额
     getCurrentRewardingPercent: Float # 获取当前的奖励档位
     getWarriors: [String] # 获取每一档的冲刺者名单
+    getFrontendBase: Int # 获取英雄计划的计算基准
   }
 `;
 

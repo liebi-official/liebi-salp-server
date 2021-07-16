@@ -259,6 +259,7 @@ const Campaign = {
             leadingAmount = new BigNumber(result[i].sum).minus(result[0].sum);
           }
 
+          console.log("bifrostAmount: ", result[i].sum);
           console.log("leadingAmount: ", leadingAmount);
 
           let level = 0;
@@ -320,6 +321,13 @@ const Campaign = {
       });
 
       return result;
+    },
+    getFrontendBase: async (parent, {}, { models }) => {
+      const result = await sequelize.query(`SELECT frontend_base FROM add`, {
+        type: QueryTypes.SELECT,
+      });
+
+      return result[0].frontend_base;
     },
   },
 };
