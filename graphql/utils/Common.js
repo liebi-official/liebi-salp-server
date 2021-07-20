@@ -6,6 +6,7 @@ dotenv.config();
 
 const MULTISIG_ACCOUNT = process.env.MULTISIG_ACCOUNT.split("|"); // 多签账户地址列表
 export const KSM_AUTHENTICATION_AMOUNT = 100000000000; // 10^11 = 0.1 KSM
+export const STOP_KSM_BLOCK = 8423835;
 
 // *************************
 // return bignumber format. Only valid for single layer filed.
@@ -280,7 +281,7 @@ export const authenticateReserveTransaction = async (account, models) => {
   );
 
   // 计算在官网投票的personalContributions
-  const queryString2 = `WHERE "para_id" = '2001' AND "account_id" = '${account}'`;
+  const queryString2 = `WHERE "para_id" = '2001' AND "account_id" = '${account} AND block_id <= ${STOP_KSM_BLOCK}'`;
   const result2 = await sequelize.query(
     `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString2} `,
     { type: QueryTypes.SELECT }
@@ -359,7 +360,7 @@ export const calculateExtendedInvitingReward = async (account, models) => {
 
   // 计算奖励基础
   let inviteesQueryString = `SELECT inviter_address FROM invitation_codes WHERE "invited_by_address" = '${account}'`;
-  let queryString = `WHERE "para_id" = '2001' AND "account_id" IN (${inviteesQueryString})`;
+  let queryString = `WHERE "para_id" = '2001' AND "account_id" IN (${inviteesQueryString}) AND block_height <= ${STOP_KSM_BLOCK}`;
 
   const result = await sequelize.query(
     `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
@@ -398,9 +399,9 @@ export const calculateExtendedSelfReward = async (account, models) => {
   let record = await models.Coefficients.findOne();
 
   // 计算在官网投票的personalContributions
-  const queryString = `WHERE "para_id" = '2001' AND "account_id" = '${account}'`;
+  const queryString = `WHERE "para_id" = '2001' AND "account_id" = '${account} AND block_height <= ${STOP_KSM_BLOCK}'`;
   const result = await sequelize.query(
-    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
+    `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString}`,
     { type: QueryTypes.SELECT }
   );
 

@@ -1,6 +1,7 @@
 import {
   campaignInfoInitialization,
   getStringQueryList,
+  STOP_KSM_BLOCK,
 } from "../utils/Common";
 import dotenv from "dotenv";
 import BigNumber from "bignumber.js";
@@ -16,7 +17,9 @@ const getMultisigAccountHistoricalBalance = async (models) => {
   // 只要是转账到多签账户的交易都计算入内
   let queryString = `WHERE "to" IN ${getStringQueryList(
     MULTISIG_ACCOUNT
-  )} AND "from" NOT IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
+  )} AND "from" NOT IN ${getStringQueryList(
+    MULTISIG_ACCOUNT
+  )} AND block_height <= ${STOP_KSM_BLOCK}`;
   let result = await sequelize.query(
     `SELECT SUM(amount::bigint) FROM transactions ${queryString} `,
     { type: QueryTypes.SELECT }
@@ -33,7 +36,7 @@ const getMultisigAccountHistoricalBalance = async (models) => {
   // 还需要添加官方crowdloan投票的金额。不含两个多签账户，不然就重复计算了
   queryString = `WHERE "para_id" = '2001' AND "account_id" NOT IN ${getStringQueryList(
     MULTISIG_ACCOUNT
-  )}`;
+  )} AND block_height <= ${STOP_KSM_BLOCK}`;
 
   result = await sequelize.query(
     `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString} `,
@@ -77,7 +80,12 @@ const Campaign = {
       const condition = {
         distinct: true,
         col: "from",
-        where: { to: MULTISIG_ACCOUNT[0] },
+        where: {
+          $and: [
+            { to: MULTISIG_ACCOUNT[0] },
+            { block_height: { $lte: STOP_KSM_BLOCK } },
+          ],
+        },
       };
 
       const votersNum = await models.Transactions.count(condition);
@@ -86,7 +94,12 @@ const Campaign = {
       const condition1 = {
         distinct: true,
         col: "account_id",
-        where: { para_id: "2001" },
+        where: {
+          $and: [
+            { para_id: "2001" },
+            { block_height: { $lte: STOP_KSM_BLOCK } },
+          ],
+        },
       };
 
       const officialVotersNum1 = await models.Contributeds.count(condition1);
@@ -105,7 +118,7 @@ const Campaign = {
       return {
         targets: record.channel_target,
         votersNum,
-        officialVotersNum,
+        officialVotersNum: 5205,
       };
     },
     getFundingProgress: async (parent, {}, { models }) => {
@@ -160,11 +173,13 @@ const Campaign = {
     ) => {
       const queryString = `WHERE "to" IN ${getStringQueryList(
         MULTISIG_ACCOUNT
-      )} AND "from" NOT IN ${getStringQueryList(MULTISIG_ACCOUNT)}`;
+      )} AND "from" NOT IN ${getStringQueryList(
+        MULTISIG_ACCOUNT
+      )} AND block_height <= ${STOP_KSM_BLOCK}`;
 
       const queryString2 = `WHERE "para_id" = '2001' AND "account_id" NOT IN ${getStringQueryList(
         MULTISIG_ACCOUNT
-      )}`;
+      )} AND block_height <= ${STOP_KSM_BLOCK}`;
 
       const result = await sequelize.query(
         `
@@ -187,7 +202,7 @@ const Campaign = {
 
       const queryString2 = `WHERE "para_id" = '2001' AND "account_id" NOT IN ${getStringQueryList(
         MULTISIG_ACCOUNT
-      )}`;
+      )} AND block_height <= ${STOP_KSM_BLOCK}`;
 
       const recordQueryString = `
       SELECT extrinsic_id, balance_of::bigint "amount", "time" FROM contributeds  ${queryString2} 
@@ -239,7 +254,7 @@ const Campaign = {
 
       // 按para_id将各个链筹得的钱分组。然后找到2001,计算它和下一名的差额。且要保证2001的排名<=4
       // 计算在官网投票的personalContributions
-      const queryString = `WHERE para_id NOT IN ('2000', '2004', '2023', '2007') GROUP BY "para_id" ORDER BY "sum" DESC`;
+      const queryString = `WHERE para_id NOT IN ('2000', '2004', '2023', '2007') AND block_height <= ${STOP_KSM_BLOCK} GROUP BY "para_id" ORDER BY "sum" DESC`;
       const result = await sequelize.query(
         `SELECT para_id, SUM(balance_of::bigint) FROM contributeds ${queryString} `,
         { type: QueryTypes.SELECT }
