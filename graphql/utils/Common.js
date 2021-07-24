@@ -399,7 +399,7 @@ export const calculateExtendedSelfReward = async (account, models) => {
   let record = await models.Coefficients.findOne();
 
   // 计算在官网投票的personalContributions
-  const queryString = `WHERE "para_id" = '2001' AND "account_id" = '${account} AND block_height <= ${STOP_KSM_BLOCK}'`;
+  const queryString = `WHERE "para_id" = '2001' AND "account_id" = '${account}' AND block_height <= ${STOP_KSM_BLOCK}`;
   const result = await sequelize.query(
     `SELECT SUM(balance_of::bigint) FROM contributeds ${queryString}`,
     { type: QueryTypes.SELECT }
